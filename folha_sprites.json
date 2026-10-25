@@ -1,0 +1,871 @@
+{
+ "personagens": {
+  "imagem": "folha_personagens.png",
+  "celula": 240,
+  "colunas": [
+   "cabeca",
+   "corpo",
+   "corpo_morto",
+   "mao",
+   "pernas_a",
+   "pernas_b",
+   "parado",
+   "andando_1",
+   "andando_2",
+   "andando_3",
+   "andando_4",
+   "pistola",
+   "katana"
+  ],
+  "linhas": [
+   "HERO",
+   "ROOSTER",
+   "TIGER",
+   "BEAR",
+   "MONKEY",
+   "WOLF",
+   "GORILLA",
+   "FISH"
+  ],
+  "sprites": [
+   {
+    "name": "HERO_cabeca",
+    "x": 0,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_corpo",
+    "x": 240,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_corpo_morto",
+    "x": 480,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_mao",
+    "x": 720,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_pernas_a",
+    "x": 960,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_pernas_b",
+    "x": 1200,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_parado",
+    "x": 1440,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_andando_1",
+    "x": 1680,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_andando_2",
+    "x": 1920,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_andando_3",
+    "x": 2160,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_andando_4",
+    "x": 2400,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_pistola",
+    "x": 2640,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "HERO_katana",
+    "x": 2880,
+    "y": 0,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_cabeca",
+    "x": 0,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_corpo",
+    "x": 240,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_corpo_morto",
+    "x": 480,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_mao",
+    "x": 720,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_pernas_a",
+    "x": 960,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_pernas_b",
+    "x": 1200,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_parado",
+    "x": 1440,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_andando_1",
+    "x": 1680,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_andando_2",
+    "x": 1920,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_andando_3",
+    "x": 2160,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_andando_4",
+    "x": 2400,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_pistola",
+    "x": 2640,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "ROOSTER_katana",
+    "x": 2880,
+    "y": 240,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_cabeca",
+    "x": 0,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_corpo",
+    "x": 240,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_corpo_morto",
+    "x": 480,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_mao",
+    "x": 720,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_pernas_a",
+    "x": 960,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_pernas_b",
+    "x": 1200,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_parado",
+    "x": 1440,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_andando_1",
+    "x": 1680,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_andando_2",
+    "x": 1920,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_andando_3",
+    "x": 2160,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_andando_4",
+    "x": 2400,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_pistola",
+    "x": 2640,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "TIGER_katana",
+    "x": 2880,
+    "y": 480,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_cabeca",
+    "x": 0,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_corpo",
+    "x": 240,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_corpo_morto",
+    "x": 480,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_mao",
+    "x": 720,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_pernas_a",
+    "x": 960,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_pernas_b",
+    "x": 1200,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_parado",
+    "x": 1440,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_andando_1",
+    "x": 1680,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_andando_2",
+    "x": 1920,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_andando_3",
+    "x": 2160,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_andando_4",
+    "x": 2400,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_pistola",
+    "x": 2640,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "BEAR_katana",
+    "x": 2880,
+    "y": 720,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_cabeca",
+    "x": 0,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_corpo",
+    "x": 240,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_corpo_morto",
+    "x": 480,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_mao",
+    "x": 720,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_pernas_a",
+    "x": 960,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_pernas_b",
+    "x": 1200,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_parado",
+    "x": 1440,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_andando_1",
+    "x": 1680,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_andando_2",
+    "x": 1920,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_andando_3",
+    "x": 2160,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_andando_4",
+    "x": 2400,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_pistola",
+    "x": 2640,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "MONKEY_katana",
+    "x": 2880,
+    "y": 960,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_cabeca",
+    "x": 0,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_corpo",
+    "x": 240,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_corpo_morto",
+    "x": 480,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_mao",
+    "x": 720,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_pernas_a",
+    "x": 960,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_pernas_b",
+    "x": 1200,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_parado",
+    "x": 1440,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_andando_1",
+    "x": 1680,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_andando_2",
+    "x": 1920,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_andando_3",
+    "x": 2160,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_andando_4",
+    "x": 2400,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_pistola",
+    "x": 2640,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "WOLF_katana",
+    "x": 2880,
+    "y": 1200,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_cabeca",
+    "x": 0,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_corpo",
+    "x": 240,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_corpo_morto",
+    "x": 480,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_mao",
+    "x": 720,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_pernas_a",
+    "x": 960,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_pernas_b",
+    "x": 1200,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_parado",
+    "x": 1440,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_andando_1",
+    "x": 1680,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_andando_2",
+    "x": 1920,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_andando_3",
+    "x": 2160,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_andando_4",
+    "x": 2400,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_pistola",
+    "x": 2640,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "GORILLA_katana",
+    "x": 2880,
+    "y": 1440,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_cabeca",
+    "x": 0,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_corpo",
+    "x": 240,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_corpo_morto",
+    "x": 480,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_mao",
+    "x": 720,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_pernas_a",
+    "x": 960,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_pernas_b",
+    "x": 1200,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_parado",
+    "x": 1440,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_andando_1",
+    "x": 1680,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_andando_2",
+    "x": 1920,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_andando_3",
+    "x": 2160,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_andando_4",
+    "x": 2400,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_pistola",
+    "x": 2640,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   },
+   {
+    "name": "FISH_katana",
+    "x": 2880,
+    "y": 1680,
+    "w": 240,
+    "h": 240
+   }
+  ]
+ },
+ "armas": {
+  "imagem": "folha_armas.png",
+  "sprites": [
+   {
+    "name": "KNIFE",
+    "x": 24,
+    "y": 24,
+    "w": 63,
+    "h": 22
+   },
+   {
+    "name": "MACHETE",
+    "x": 333,
+    "y": 24,
+    "w": 157,
+    "h": 36
+   },
+   {
+    "name": "AXE",
+    "x": 642,
+    "y": 24,
+    "w": 162,
+    "h": 72
+   },
+   {
+    "name": "BAT",
+    "x": 951,
+    "y": 24,
+    "w": 140,
+    "h": 31
+   },
+   {
+    "name": "KATANA",
+    "x": 24,
+    "y": 144,
+    "w": 189,
+    "h": 32
+   },
+   {
+    "name": "SPEAR",
+    "x": 333,
+    "y": 144,
+    "w": 261,
+    "h": 36
+   },
+   {
+    "name": "WINE",
+    "x": 642,
+    "y": 144,
+    "w": 126,
+    "h": 36
+   },
+   {
+    "name": "BROKEN",
+    "x": 951,
+    "y": 144,
+    "w": 104,
+    "h": 36
+   },
+   {
+    "name": "PISTOL",
+    "x": 24,
+    "y": 264,
+    "w": 59,
+    "h": 42
+   },
+   {
+    "name": "REVOLVER",
+    "x": 333,
+    "y": 264,
+    "w": 72,
+    "h": 49
+   },
+   {
+    "name": "SMG",
+    "x": 642,
+    "y": 264,
+    "w": 113,
+    "h": 58
+   },
+   {
+    "name": "RIFLE",
+    "x": 951,
+    "y": 264,
+    "w": 158,
+    "h": 52
+   },
+   {
+    "name": "SHOTGUN",
+    "x": 24,
+    "y": 384,
+    "w": 162,
+    "h": 30
+   },
+   {
+    "name": "SNIPER",
+    "x": 333,
+    "y": 384,
+    "w": 217,
+    "h": 56
+   },
+   {
+    "name": "MINIGUN",
+    "x": 642,
+    "y": 384,
+    "w": 146,
+    "h": 72
+   }
+  ]
+ }
+}
