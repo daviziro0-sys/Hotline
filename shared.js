@@ -1119,8 +1119,8 @@
           }
           if (tot > 0) {
             hitAny = true;
-            if (o.down) this.hurt(o, p, tot * EXEC_MULT, 'exec', aa);
-            else { this.hurt(o, p, tot, 'melee', aa); if (knock) this.knockdown(o, DOWN_TIME, aa); }
+            if (o.down) this.hurt(o, p, tot * EXEC_MULT, 'exec', aa, p.weapon ? p.weapon.type : 'FISTS');
+            else { this.hurt(o, p, tot, 'melee', aa, p.weapon ? p.weapon.type : 'FISTS'); if (knock) this.knockdown(o, DOWN_TIME, aa); }
           }
         }
         // garrafa inteira que bate numa parede/porta/móvel: QUEBRA e vira garrafa quebrada (se acertou alguém, sobrevive)
@@ -1183,23 +1183,23 @@
       return true;
     }
     // Tira `pct`% da vida máxima. Se zerar, mata.
-    hurt(v, by, pct, how, a) {
+    hurt(v, by, pct, how, a, w) {
       if (!v.alive || this.phase !== 'live') return false;
       if (v.dive) return false;   // mergulhado: nada te atinge (o afogamento mata direto em kill)
       v.emT = 0;   // tomou dano: para de dançar
       if (how !== 'blast' && how !== 'door') { pct *= dmgTakenOf(v.skin); if (v.dualOn) pct *= PANTHER_DMG; if (v.fxDmg) pct *= v.fxDmg; }   // passiva: dano de ARMAS reduzido (a explosão do Shadow 2 não)
       v.hp = Math.max(0, v.hp - MAX_HP * pct / 100);
       this.events.push({ t: 'hurt', id: v.id, x: v.x, y: v.y, a, hp: Math.round(v.hp), by: by ? by.id : null });
-      if (v.hp <= 0) this.kill(v, by, how, a);
+      if (v.hp <= 0) this.kill(v, by, how, a, w);
       return true;
     }
-    kill(v, by, how, a) {
+    kill(v, by, how, a, w) {
       if (!v.alive || this.phase !== 'live') return;
       const wasDk = (v.dualOn || (v.down && v.wasDual)) ? 1 : 0;   // máscara preta do Shadow 7 (modo dupla) na hora da morte
       v.alive = false; v.down = false; v.fire = false; v.charging = false;
       if (by && by !== v) by.kills = (by.kills | 0) + 1;
       this.dropAll(v, Math.cos(a) * 120, Math.sin(a) * 120);
-      this.events.push({ t: 'kill', id: v.id, x: v.x, y: v.y, a, how, by: by ? by.id : null, sk: v.skin, dk: wasDk });
+      this.events.push({ t: 'kill', id: v.id, x: v.x, y: v.y, a, how, w, by: by ? by.id : null, sk: v.skin, dk: wasDk });   // w = arma que matou (escolhe o sprite de morte)
     }
     knockdown(p, dur, a) {
       if (!p.alive || p.down || p.dive) return;
@@ -1573,8 +1573,8 @@
           for (const p of this.players) {
             if (!p || !p.alive || p.dive || p.id === b.owner) continue;
             if (segDist(p.x, p.y, px, py, b.x, b.y) < (b.r || PR)) {
-              if (b.w === 'ORB') { b.hit = b.hit || new Set(); if (b.hit.has(p.id)) continue; b.hit.add(p.id); this.hurt(p, this.byId(b.owner), ORB_DMG, 'bullet', Math.atan2(b.vy, b.vx)); continue; }   // soco do gorila: atravessa e pega TODOS na área, 1x cada
-              dead = true; this.hurt(p, this.byId(b.owner), b.w === 'ORB' ? ORB_DMG : WEAPONS[b.w].dmg, 'bullet', Math.atan2(b.vy, b.vx)); break; }
+              if (b.w === 'ORB') { b.hit = b.hit || new Set(); if (b.hit.has(p.id)) continue; b.hit.add(p.id); this.hurt(p, this.byId(b.owner), ORB_DMG, 'bullet', Math.atan2(b.vy, b.vx), 'ORB'); continue; }   // soco do gorila: atravessa e pega TODOS na área, 1x cada
+              dead = true; this.hurt(p, this.byId(b.owner), b.w === 'ORB' ? ORB_DMG : WEAPONS[b.w].dmg, 'bullet', Math.atan2(b.vy, b.vx), b.w); break; }
           }
         }
         b.life -= dt;
@@ -1629,7 +1629,7 @@
                 } else if (wd.jav) {                  // lança: dano cresce com o tempo que o jogador segurou
                   pct = Math.round(SPEAR_THROW_MIN + (SPEAR_THROW_MAX - SPEAR_THROW_MIN) * (it.pow || 0)); how = 'spear'; pw = pct;
                 }
-                this.hurt(p, this.byId(it.owner), pct, how, ang);
+                this.hurt(p, this.byId(it.owner), pct, how, ang, it.type);
                 { const td = it.type in THROW_DOWN ? THROW_DOWN[it.type] : 1; if (!bl && td > 0 && p.alive && !p.down) this.knockdown(p, td, ang); }
                 this.events.push({ t: 'thit', x: it.x, y: it.y, bl, cb, pw, gl });
                 stop = true; it.vx *= -0.1; it.vy *= -0.1; break;
