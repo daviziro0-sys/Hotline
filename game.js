@@ -12,6 +12,9 @@ const IS_TOUCH = /[?&]touch=1/.test(location.search) || matchMedia('(hover:none)
 // REGIÕES DE SERVIDOR: o jogo mede o ping de cada uma ao abrir e usa a mais rápida para quem está jogando.
 // host '' = o próprio servidor de onde a página foi aberta. Para ter mais regiões, adicione linhas, ex.:
 //   { id: 'us', name: 'EUA', host: 'us.seujogo.com' }
+// P2P_MODE = true: online sem servidor (quem cria a sala hospeda a partida no próprio navegador; funciona no GitHub Pages).
+// P2P_MODE = false: usa o servidor Node (server.js) pelas REGIONS abaixo.
+const P2P_MODE = true;
 const REGIONS = [
   { id: 'sp', name: 'São Paulo', host: '' },
 ];
@@ -535,13 +538,14 @@ let roomCode = '';
 let connTok = 0;
 async function startOnline(opt = { mode: 'quick' }) {
   closeAll(); mode = 'online'; roomCode = ''; const tok = ++connTok;
-  status(REGIONS.length > 1 ? 'Procurando o melhor servidor…' : 'Conectando ao servidor…');
+  status(P2P_MODE ? (opt.mode === 'create' ? 'Criando a sala…' : 'Conectando na sala…') : REGIONS.length > 1 ? 'Procurando o melhor servidor…' : 'Conectando ao servidor…');
   await regionsReady;
   if (tok !== connTok || mode !== 'online') return;   // cancelado enquanto media o ping
   const tried = opt.tried || [];
   const region = (opt.region && regionById(opt.region)) || regionOrder.find(r => !tried.includes(r.id)) || regionOrder[0];
-  curRegion = region; status('Conectando' + (REGIONS.length > 1 ? ' · ' + region.name : ' ao servidor') + '…');
-  try { ws = new WebSocket(regionUrl(region)); } catch { mode = null; return status('Endereço do servidor inválido.'); }
+  curRegion = region; if (!P2P_MODE) status('Conectando' + (REGIONS.length > 1 ? ' · ' + region.name : ' ao servidor') + '…');
+  if (P2P_MODE && typeof Peer === 'undefined') { mode = null; return showMenu('Não carregou a biblioteca de conexão (PeerJS). Verifique a internet e recarregue a página.'); }
+  try { ws = P2P_MODE ? (opt.mode === 'create' ? P2P.newHostSocket() : P2P.newGuestSocket(opt.room || '')) : new WebSocket(regionUrl(region)); } catch { mode = null; return status('Endereço do servidor inválido.'); }
   const sock = ws;
   sock.onopen = () => {
     sock.send(JSON.stringify({ type: 'join', name: playerName(), skin: cfg.skin, mode: opt.mode, room: opt.room || '', cfg: opt.cfg || null }));
@@ -558,12 +562,18 @@ async function startOnline(opt = { mode: 'quick' }) {
       if (next) return startOnline(Object.assign({}, opt, { region: next.id, tried: t2 }));
       closeAll(); showMenu('Sala não encontrada. Confira o código.');
     }
+    else if (m.type === 'p2perror') {
+      closeAll();
+      showMenu(opt.mode === 'create'
+        ? 'Não foi possível criar a sala: sem conexão com o serviço de salas. Tente de novo.'
+        : 'Não foi possível conectar nessa sala. A rede de alguém pode estar bloqueando a conexão direta; tente outra rede (Wi-Fi/4G).');
+    }
     else if (m.type === 'busy') { closeAll(); showMenu('O servidor está com o máximo de salas abertas. Tente de novo em instantes.'); }
     else if (m.type === 's') onSnapshot(m);
     else if (m.type === 'pong') pingMs = Math.round(performance.now() - m.t);
   };
-  sock.onerror = () => { if (mode === 'online' && !snap) status('Falha de conexão. O servidor está ligado?'); };
-  sock.onclose = () => { const had = !!snap; closeAll(); showMenu(had ? 'Conexão perdida com o servidor.' : 'Não foi possível conectar. O servidor pode estar iniciando, tente de novo em 30 s.'); };
+  sock.onerror = () => { if (mode === 'online' && !snap) status(P2P_MODE ? 'Falha de conexão.' : 'Falha de conexão. O servidor está ligado?'); };
+  sock.onclose = () => { const had = !!snap; closeAll(); showMenu(had ? (P2P_MODE ? 'Conexão perdida com o anfitrião.' : 'Conexão perdida com o servidor.') : (P2P_MODE ? 'Não foi possível conectar. Confira o código da sala.' : 'Não foi possível conectar. O servidor pode estar iniciando, tente de novo em 30 s.')); };
 }
 function startLocal(o) {
   o = sanitizeBotCfg(o);
