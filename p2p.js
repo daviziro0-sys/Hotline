@@ -1,1 +1,364 @@
-"use strict";const P2P=(()=>{const f="sh7x-",m={debug:0,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"},{urls:"stun:global.stun.twilio.com:3478"},{urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},{urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},{urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"}],iceCandidatePoolSize:4}},y="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",k=["HERO","ROOSTER","TIGER","BEAR","MONKEY","WOLF","GORILLA","FISH"],d=1/60,w=12;let c=null;const g=n=>{if(typeof n=="string")return n;try{return new TextDecoder().decode(n)}catch{return""}};function v(n){try{const t=URL.createObjectURL(new Blob(["setInterval(function(){postMessage(0)},8)"],{type:"text/javascript"})),s=new Worker(t);return s.onmessage=n,()=>{try{s.terminate(),URL.revokeObjectURL(t)}catch{}}}catch{const t=setInterval(n,8);return()=>clearInterval(t)}}class S{constructor(){this.room=null,this.clients=new Map,this.nextId=1,this.peer=null,this.stopTimer=null,this.hk=0,this.dead=!1,this.opening=!1,this.last=0,this.acc=0,this.tickN=0,this.wake=null,this._vis=null}addClient(t,s){const e={id:"p"+this.nextId++,send:t,local:!!s,p:null,msgs:0,seen:Date.now(),conn:null};return this.clients.set(e.id,e),this.reply(e,{type:"welcome",id:e.id}),e}reply(t,s){try{t.send(JSON.stringify(s))}catch{}}handle(t,s){if(this.dead||typeof s!="string"||s.length>2048||(t.seen=Date.now(),++t.msgs>400))return;let e;try{e=JSON.parse(s)}catch{return}if(!e||typeof e!="object")return;if(e.type==="join")return this.join(t,e);if(!t.p||!this.room){e.type==="ping"&&this.reply(t,{type:"pong",t:e.t});return}const i=this.room.game;if(e.type==="input"){const o=Number(e.seq),a=Number(e.dt),l=Number(e.a);if(!Number.isFinite(o)||!Number.isFinite(a)||!Number.isFinite(l))return;o>t.p.ack&&(t.p.ack=o),i.applyInput(t.p,{k:Number(e.k)|0,a:l,ad:e.ad==null?void 0:Math.max(0,Math.min(2e3,Number(e.ad)||0)),f:e.f?1:0,fp:e.fp?1:0,pk:e.pk?1:0,it:e.it?1:0,th:e.th?1:0,hl:e.hl?1:0,tc:e.tc?1:0,sw:e.sw?1:0,sl:e.sl?1:0,em:e.em?1:0,ct:e.ct?1:0,ss:Math.max(0,Math.min(2,Number(e.ss)|0))},Math.max(0,Math.min(.05,a)));return}if(e.type==="start"){i.requestStart(t.id)||this.reply(t,{type:"error",message:"S\xF3 o anfitri\xE3o inicia, com 2 ou mais jogadores."});return}e.type==="ping"&&this.reply(t,{type:"pong",t:e.t})}join(t,s){if(t.p)return;const e=k.includes(s.skin)?s.skin:s.skin==="HIPPO"?"GORILLA":"HERO",i=String(s.name||"JOGADOR").replace(/[<>]/g,"").slice(0,14);if(s.mode==="create")return!t.local||this.room||this.opening?void 0:(this.opening=!0,this.openRoom(t,s,e,i));const o=String(s.room||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);if(!this.room||o!==this.room.code)return this.reply(t,{type:"noroom"});this.seat(t,e,i)}seat(t,s,e){const i=this.room.game;if(i.count>=i.maxPlayers)return this.reply(t,{type:"full"});if(t.p=i.addPlayer(t.id,e,s),!t.p)return this.reply(t,{type:"full"});this.room.clients.add(t),this.reply(t,{type:"joined",id:t.id,slot:t.p.slot,room:this.room.code})}openRoom(t,s,e,i){let o=0;const a=()=>{if(this.dead)return;let u="";for(let r=0;r<4;r++)u+=y[Math.floor(Math.random()*y.length)];let h;try{h=new Peer(f+u,m)}catch{return l("lib")}this.peer=h;const b=setTimeout(()=>l("broker"),15e3);h.on("open",()=>{clearTimeout(b),!this.dead&&(this.room={code:u,game:new Shared.Game(Shared.sanitizeRoomCfg(Object.assign({map:s.map},s.cfg))),clients:new Set},this.seat(t,e,i),this.begin())}),h.on("error",r=>{if(clearTimeout(b),!this.room){if(r&&r.type==="unavailable-id"&&++o<8){try{h.destroy()}catch{}return a()}l(r&&r.type)}}),h.on("disconnected",()=>{const q=()=>{if(this.dead||!h.disconnected)return;try{h.reconnect()}catch{}setTimeout(q,5e3)};setTimeout(q,500)}),h.on("connection",r=>this.onConn(r))},l=u=>{this.opening=!1,this.reply(t,{type:"p2perror",reason:String(u||"erro")})};a()}onConn(t){let s=null;t.on("open",()=>{if(this.dead||this.clients.size>=w)return t.close();s=this.addClient((i,o)=>{if(!t.open)return;const a=t.dataChannel;o&&a&&a.bufferedAmount>262144||t.send(i)},!1),s.conn=t}),t.on("data",i=>{s&&this.handle(s,g(i))});const e=()=>{s&&this.drop(s)};t.on("close",e),t.on("error",e)}drop(t){if(this.clients.has(t.id)){if(this.clients.delete(t.id),t.p&&this.room&&(this.room.game.removePlayer(t.id),this.room.clients.delete(t)),t.conn)try{t.conn.close()}catch{}t.local&&this.shutdown()}}begin(){this.last=Date.now(),this.acc=0,this.stopTimer=v(()=>{if(this.dead||!this.room)return;const s=Date.now();for(this.acc+=Math.min(.25,(s-this.last)/1e3),this.last=s;this.acc>=d;){const e=this.room.clients.size>3?2:1;this.room.game.tick(d),++this.tickN%e===0&&this.broadcast(),this.acc-=d}}),this.hk=setInterval(()=>{const s=Date.now();for(const e of[...this.clients.values()])e.msgs=0,!e.local&&s-e.seen>25e3&&this.drop(e)},1e3);const t=()=>{try{navigator.wakeLock.request("screen").then(s=>{this.wake=s}).catch(()=>{})}catch{}};t(),this._vis=()=>{document.visibilityState==="visible"&&!this.dead&&t()};try{document.addEventListener("visibilitychange",this._vis)}catch{}}broadcast(){const t=this.room.game,s=t.snapshot();t.events=[];const e=JSON.stringify(s).slice(0,-1)+',"room":"'+this.room.code+'"';for(const i of this.room.clients)i.p&&i.send(e+',"ack":'+(i.p.ack|0)+"}",!0)}shutdown(){if(!this.dead){this.dead=!0,this.stopTimer&&this.stopTimer(),clearInterval(this.hk);for(const t of this.clients.values())if(t.conn)try{t.conn.close()}catch{}try{this.peer&&this.peer.destroy()}catch{}try{this.wake&&this.wake.release()}catch{}try{document.removeEventListener("visibilitychange",this._vis)}catch{}this.clients.clear(),this.room=null,c===this&&(c=null)}}}class O{constructor(){this.readyState=0,this.onopen=this.onmessage=this.onclose=this.onerror=null,c&&c.shutdown(),this.host=c=new S,setTimeout(()=>{this.readyState!==3&&(this.readyState=1,this.c=this.host.addClient(t=>queueMicrotask(()=>{this.readyState===1&&this.onmessage&&this.onmessage({data:t})}),!0),this.onopen&&this.onopen())},0)}send(t){if(this.readyState!==1)return;const s=this.c;queueMicrotask(()=>this.host.handle(s,t))}close(){this.readyState!==3&&(this.readyState=3,this.host.shutdown())}}class N{constructor(t){this.readyState=0,this.onopen=this.onmessage=this.onclose=this.onerror=null,this.done=!1,this.opened=!1,this.peer=null,this.conn=null,this.room=t,this.tries=0,this.to=null,this.attempt()}attempt(){if(this.done)return;this.tries++,clearTimeout(this.to);try{this.peer&&this.peer.destroy()}catch{}this.peer=this.conn=null;let s;try{s=this.peer=new Peer(m)}catch{return void setTimeout(()=>this.fail("lib"),0)}const r=x=>{this.done||this.opened||this.peer!==s||(this.tries<3?this.attempt():this.fail(x))};this.to=setTimeout(()=>r("timeout"),1e4),s.on("open",()=>{if(this.done||this.peer!==s)return;const e=this.conn=s.connect(f+this.room,{reliable:!1,serialization:"none"});e.on("open",()=>{this.done||this.peer!==s||(clearTimeout(this.to),this.opened=!0,this.readyState=1,this.onopen&&this.onopen())}),e.on("data",i=>{this.onmessage&&!this.done&&this.onmessage({data:g(i)})}),e.on("close",()=>this.opened?this.lost():r("close")),e.on("error",()=>this.opened?this.lost():r("erro"))}),s.on("error",e=>{if(!this.done&&this.peer===s){if(e&&e.type==="peer-unavailable")return this.emit({type:"noroom"}),this.finish(!1);this.opened||r(e&&e.type||"erro")}})}emit(t){this.onmessage&&this.onmessage({data:JSON.stringify(t)})}fail(t){this.done||(this.emit({type:"p2perror",reason:t}),this.finish(!1))}lost(){this.done||this.finish(!0)}finish(t){this.done=!0,this.readyState=3,clearTimeout(this.to);try{this.peer&&this.peer.destroy()}catch{}t&&this.onclose&&this.onclose({})}send(t){if(this.readyState===1)try{this.conn.send(t)}catch{}}close(){this.done||this.finish(!1)}}let p=null;return{newHostSocket:()=>new O,newGuestSocket:n=>new N(n),Host:S,loadLib:()=>typeof Peer<"u"?Promise.resolve(!0):p||(p=new Promise(n=>{const t=["https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js","https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"],s=e=>{if(e>=t.length)return p=null,n(!1);const i=document.createElement("script");i.src=t[e],i.async=!0,i.onload=()=>typeof Peer<"u"?n(!0):s(e+1),i.onerror=()=>{i.remove(),s(e+1)},document.head.appendChild(i)};s(0)}))}})();typeof module=="object"&&module.exports&&(module.exports=P2P);
+"use strict";
+/* ============================================================================
+   P2P (WebRTC via PeerJS)  |  7 SHADOWS
+   Camada de conexão portada do OUTCOME:
+   - o anfitrião registra o ID "sh7x-XXXX" no broker gratuito do PeerJS e os
+     outros jogadores se conectam a ele (sem servidor próprio);
+   - sem lista de ICE própria: usa a configuração PADRÃO do PeerJS (STUN do
+     Google + TURN do próprio PeerJS), igual ao OUTCOME;
+   - canal de dados CONFIÁVEL (reliable), igual ao OUTCOME.
+   A API pública não mudou (newHostSocket, newGuestSocket, Host, loadLib),
+   então o game.js continua igual.
+   ========================================================================== */
+const P2P = (() => {
+  const PFX = "sh7x-";                       // prefixo do ID da sala no broker
+  const OPTS = { debug: 0 };                 // SEM "config": mantém os servidores ICE padrão do PeerJS (como no OUTCOME)
+  const RELIABLE = true;                     // OUTCOME usa canal confiável; ponha false para voltar ao modo "sem retransmissão"
+  const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const SKINS = ["HERO", "ROOSTER", "TIGER", "BEAR", "MONKEY", "WOLF", "GORILLA", "FISH"];
+  const STEP = 1 / 60;
+  const MAX_CLIENTS = 12;
+  const MAX_BUFFERED = 262144;               // se o canal do convidado acumular mais que isso, descarta snapshots
+  let current = null;                        // anfitrião ativo (só existe um por aba)
+
+  const asText = d => {
+    if (typeof d === "string") return d;
+    try { return new TextDecoder().decode(d); } catch { return ""; }
+  };
+
+  // timer de 8 ms em Worker (não é freado quando a aba fica em segundo plano)
+  function ticker(fn) {
+    try {
+      const url = URL.createObjectURL(new Blob(["setInterval(function(){postMessage(0)},8)"], { type: "text/javascript" }));
+      const w = new Worker(url);
+      w.onmessage = fn;
+      return () => { try { w.terminate(); URL.revokeObjectURL(url); } catch {} };
+    } catch {
+      const id = setInterval(fn, 8);
+      return () => clearInterval(id);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* ANFITRIÃO: simula o jogo e atende todos os clientes (locais e remotos) */
+  /* ---------------------------------------------------------------------- */
+  class Host {
+    constructor() {
+      this.room = null; this.clients = new Map(); this.nextId = 1;
+      this.peer = null; this.stopTimer = null; this.hk = 0;
+      this.dead = false; this.opening = false;
+      this.last = 0; this.acc = 0; this.tickN = 0;
+      this.wake = null; this._vis = null;
+    }
+
+    addClient(send, local) {
+      const c = { id: "p" + this.nextId++, send, local: !!local, p: null, msgs: 0, seen: Date.now(), conn: null };
+      this.clients.set(c.id, c);
+      this.reply(c, { type: "welcome", id: c.id });
+      return c;
+    }
+
+    reply(c, msg) { try { c.send(JSON.stringify(msg)); } catch {} }
+
+    handle(c, text) {
+      if (this.dead || typeof text !== "string" || text.length > 2048) return;
+      c.seen = Date.now();
+      if (++c.msgs > 400) return;            // limite de mensagens por segundo
+      let m;
+      try { m = JSON.parse(text); } catch { return; }
+      if (!m || typeof m !== "object") return;
+      if (m.type === "join") return this.join(c, m);
+      if (!c.p || !this.room) {
+        if (m.type === "ping") this.reply(c, { type: "pong", t: m.t });
+        return;
+      }
+      const game = this.room.game;
+      if (m.type === "input") {
+        const seq = Number(m.seq), dt = Number(m.dt), a = Number(m.a);
+        if (!Number.isFinite(seq) || !Number.isFinite(dt) || !Number.isFinite(a)) return;
+        if (seq > c.p.ack) c.p.ack = seq;
+        game.applyInput(c.p, {
+          k: Number(m.k) | 0, a,
+          ad: m.ad == null ? undefined : Math.max(0, Math.min(2000, Number(m.ad) || 0)),
+          f: m.f ? 1 : 0, fp: m.fp ? 1 : 0, pk: m.pk ? 1 : 0, it: m.it ? 1 : 0, th: m.th ? 1 : 0,
+          hl: m.hl ? 1 : 0, tc: m.tc ? 1 : 0, sw: m.sw ? 1 : 0, sl: m.sl ? 1 : 0, em: m.em ? 1 : 0,
+          ct: m.ct ? 1 : 0, ss: Math.max(0, Math.min(2, Number(m.ss) | 0)),
+        }, Math.max(0, Math.min(0.05, dt)));
+        return;
+      }
+      if (m.type === "start") {
+        if (!game.requestStart(c.id)) this.reply(c, { type: "error", message: "Só o anfitrião inicia, com 2 ou mais jogadores." });
+        return;
+      }
+      if (m.type === "ping") this.reply(c, { type: "pong", t: m.t });
+    }
+
+    join(c, m) {
+      if (c.p) return;
+      const skin = SKINS.includes(m.skin) ? m.skin : m.skin === "HIPPO" ? "GORILLA" : "HERO";
+      const name = String(m.name || "JOGADOR").replace(/[<>]/g, "").slice(0, 14);
+      if (m.mode === "create") {
+        if (!c.local || this.room || this.opening) return;
+        this.opening = true;
+        return this.openRoom(c, m, skin, name);
+      }
+      const code = String(m.room || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+      if (!this.room || code !== this.room.code) return this.reply(c, { type: "noroom" });
+      this.seat(c, skin, name);
+    }
+
+    seat(c, skin, name) {
+      const game = this.room.game;
+      if (game.count >= game.maxPlayers) return this.reply(c, { type: "full" });
+      c.p = game.addPlayer(c.id, name, skin);
+      if (!c.p) return this.reply(c, { type: "full" });
+      this.room.clients.add(c);
+      this.reply(c, { type: "joined", id: c.id, slot: c.p.slot, room: this.room.code });
+    }
+
+    // registra "sh7x-XXXX" no broker do PeerJS (tenta outro código se já estiver em uso)
+    openRoom(c, m, skin, name) {
+      let tries = 0;
+      const fail = why => {
+        this.opening = false;
+        this.reply(c, { type: "p2perror", reason: String(why || "erro") });
+      };
+      const attempt = () => {
+        if (this.dead) return;
+        let code = "";
+        for (let i = 0; i < 4; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+        let peer;
+        try { peer = new Peer(PFX + code, OPTS); } catch { return fail("lib"); }
+        this.peer = peer;
+        const brokerTimeout = setTimeout(() => fail("broker"), 15000);
+        peer.on("open", () => {
+          clearTimeout(brokerTimeout);
+          if (this.dead) return;
+          this.room = {
+            code,
+            game: new Shared.Game(Shared.sanitizeRoomCfg(Object.assign({ map: m.map }, m.cfg))),
+            clients: new Set(),
+          };
+          this.seat(c, skin, name);
+          this.begin();
+        });
+        peer.on("error", e => {
+          clearTimeout(brokerTimeout);
+          if (this.room) return;
+          if (e && e.type === "unavailable-id" && ++tries < 8) {
+            try { peer.destroy(); } catch {}
+            return attempt();
+          }
+          fail(e && e.type);
+        });
+        peer.on("disconnected", () => {      // perdeu o broker: tenta reconectar (as conexões já abertas continuam)
+          const retry = () => {
+            if (this.dead || !peer.disconnected) return;
+            try { peer.reconnect(); } catch {}
+            setTimeout(retry, 5000);
+          };
+          setTimeout(retry, 500);
+        });
+        peer.on("connection", conn => this.onConn(conn));
+      };
+      attempt();
+    }
+
+    // um convidado abriu conexão com o anfitrião
+    onConn(conn) {
+      let c = null;
+      conn.on("open", () => {
+        if (this.dead || this.clients.size >= MAX_CLIENTS) return conn.close();
+        c = this.addClient((msg, droppable) => {
+          if (!conn.open) return;
+          const dc = conn.dataChannel;
+          if (droppable && dc && dc.bufferedAmount > MAX_BUFFERED) return;   // snapshots velhos não valem a pena
+          conn.send(msg);
+        }, false);
+        c.conn = conn;
+      });
+      conn.on("data", d => { if (c) this.handle(c, asText(d)); });
+      const gone = () => { if (c) this.drop(c); };
+      conn.on("close", gone);
+      conn.on("error", gone);
+    }
+
+    drop(c) {
+      if (!this.clients.has(c.id)) return;
+      this.clients.delete(c.id);
+      if (c.p && this.room) { this.room.game.removePlayer(c.id); this.room.clients.delete(c); }
+      if (c.conn) { try { c.conn.close(); } catch {} }
+      if (c.local) this.shutdown();          // o anfitrião saiu: a sala fecha para todos
+    }
+
+    begin() {
+      this.last = Date.now(); this.acc = 0;
+      this.stopTimer = ticker(() => {
+        if (this.dead || !this.room) return;
+        const now = Date.now();
+        this.acc += Math.min(0.25, (now - this.last) / 1000);
+        this.last = now;
+        while (this.acc >= STEP) {
+          const every = this.room.clients.size > 3 ? 2 : 1;   // com mais de 3 jogadores envia 1 snapshot a cada 2 ticks
+          this.room.game.tick(STEP);
+          if (++this.tickN % every === 0) this.broadcast();
+          this.acc -= STEP;
+        }
+      });
+      this.hk = setInterval(() => {
+        const now = Date.now();
+        for (const c of [...this.clients.values()]) {
+          c.msgs = 0;
+          if (!c.local && now - c.seen > 25000) this.drop(c);   // sumiu há 25 s: remove
+        }
+      }, 1000);
+      const lock = () => { try { navigator.wakeLock.request("screen").then(w => { this.wake = w; }).catch(() => {}); } catch {} };
+      lock();
+      this._vis = () => { if (document.visibilityState === "visible" && !this.dead) lock(); };
+      try { document.addEventListener("visibilitychange", this._vis); } catch {}
+    }
+
+    broadcast() {
+      const game = this.room.game, snap = game.snapshot();
+      game.events = [];
+      const base = JSON.stringify(snap).slice(0, -1) + ',"room":"' + this.room.code + '"';
+      for (const c of this.room.clients) if (c.p) c.send(base + ',"ack":' + (c.p.ack | 0) + "}", true);
+    }
+
+    shutdown() {
+      if (this.dead) return;
+      this.dead = true;
+      this.stopTimer && this.stopTimer();
+      clearInterval(this.hk);
+      for (const c of this.clients.values()) if (c.conn) { try { c.conn.close(); } catch {} }
+      try { this.peer && this.peer.destroy(); } catch {}
+      try { this.wake && this.wake.release(); } catch {}
+      try { document.removeEventListener("visibilitychange", this._vis); } catch {}
+      this.clients.clear();
+      this.room = null;
+      if (current === this) current = null;
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* SOCKET DO ANFITRIÃO: parece um WebSocket, mas fala direto com o Host    */
+  /* ---------------------------------------------------------------------- */
+  class HostSocket {
+    constructor() {
+      this.readyState = 0;
+      this.onopen = this.onmessage = this.onclose = this.onerror = null;
+      if (current) current.shutdown();
+      this.host = current = new Host();
+      setTimeout(() => {
+        if (this.readyState === 3) return;
+        this.readyState = 1;
+        this.c = this.host.addClient(msg => queueMicrotask(() => {
+          if (this.readyState === 1 && this.onmessage) this.onmessage({ data: msg });
+        }), true);
+        this.onopen && this.onopen();
+      }, 0);
+    }
+    send(t) {
+      if (this.readyState !== 1) return;
+      const c = this.c;
+      queueMicrotask(() => this.host.handle(c, t));
+    }
+    close() {
+      if (this.readyState === 3) return;
+      this.readyState = 3;
+      this.host.shutdown();
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* SOCKET DO CONVIDADO: conecta em "sh7x-CODIGO" (igual ao joinRoom do OUTCOME) */
+  /* ---------------------------------------------------------------------- */
+  class GuestSocket {
+    constructor(room) {
+      this.readyState = 0;
+      this.onopen = this.onmessage = this.onclose = this.onerror = null;
+      this.done = false; this.opened = false;
+      this.peer = null; this.conn = null;
+      this.room = room; this.tries = 0; this.to = null;
+      this.attempt();
+    }
+
+    attempt() {
+      if (this.done) return;
+      this.tries++;
+      clearTimeout(this.to);
+      try { this.peer && this.peer.destroy(); } catch {}
+      this.peer = this.conn = null;
+      let peer;
+      try { peer = this.peer = new Peer(OPTS); } catch { return void setTimeout(() => this.fail("lib"), 0); }
+      const retry = why => {
+        if (this.done || this.opened || this.peer !== peer) return;
+        this.tries < 3 ? this.attempt() : this.fail(why);
+      };
+      this.to = setTimeout(() => retry("timeout"), 10000);
+      peer.on("open", () => {
+        if (this.done || this.peer !== peer) return;
+        const conn = this.conn = peer.connect(PFX + this.room, { reliable: RELIABLE, serialization: "none" });
+        conn.on("open", () => {
+          if (this.done || this.peer !== peer) return;
+          clearTimeout(this.to);
+          this.opened = true;
+          this.readyState = 1;
+          this.onopen && this.onopen();
+        });
+        conn.on("data", d => { this.onmessage && !this.done && this.onmessage({ data: asText(d) }); });
+        conn.on("close", () => this.opened ? this.lost() : retry("close"));
+        conn.on("error", () => this.opened ? this.lost() : retry("erro"));
+      });
+      peer.on("error", e => {
+        if (this.done || this.peer !== peer) return;
+        if (e && e.type === "peer-unavailable") {          // ninguém registrou esse código
+          this.emit({ type: "noroom" });
+          return this.finish(false);
+        }
+        this.opened || retry((e && e.type) || "erro");
+      });
+    }
+
+    emit(m) { this.onmessage && this.onmessage({ data: JSON.stringify(m) }); }
+    fail(why) {
+      if (this.done) return;
+      this.emit({ type: "p2perror", reason: why });
+      this.finish(false);
+    }
+    lost() { if (!this.done) this.finish(true); }
+    finish(notify) {
+      this.done = true;
+      this.readyState = 3;
+      clearTimeout(this.to);
+      try { this.peer && this.peer.destroy(); } catch {}
+      notify && this.onclose && this.onclose({});
+    }
+    send(t) {
+      if (this.readyState !== 1) return;
+      try { this.conn.send(t); } catch {}
+    }
+    close() { if (!this.done) this.finish(false); }
+  }
+
+  /* carrega o PeerJS sob demanda (2 CDNs de reserva), caso a tag do HTML não tenha carregado */
+  let libPromise = null;
+  const loadLib = () => typeof Peer !== "undefined" ? Promise.resolve(true) : libPromise || (libPromise = new Promise(done => {
+    const urls = [
+      "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js",
+      "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js",
+    ];
+    const next = i => {
+      if (i >= urls.length) { libPromise = null; return done(false); }
+      const s = document.createElement("script");
+      s.src = urls[i]; s.async = true;
+      s.onload = () => typeof Peer !== "undefined" ? done(true) : next(i + 1);
+      s.onerror = () => { s.remove(); next(i + 1); };
+      document.head.appendChild(s);
+    };
+    next(0);
+  }));
+
+  return { newHostSocket: () => new HostSocket(), newGuestSocket: room => new GuestSocket(room), Host, loadLib };
+})();
+typeof module === "object" && module.exports && (module.exports = P2P);
