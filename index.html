@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a1a4a">
+  <title>7 SHADOWS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Pixelify+Sans:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="touch.css">
+  <link rel="stylesheet" href="menu-dc.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="invBar" class="hidden">
+      <div class="slot" id="slot0"><span class="k">1</span><img alt=""><b class="sn"></b><span class="sa"></span></div>
+      <div class="slot" id="slot1"><span class="k">2</span><img alt=""><b class="sn"></b><span class="sa"></span></div>
+    </div>
+    <div id="nowPlaying" class="hidden"></div>
+    <div id="spectate" class="hidden"><small>ESPECTANDO</small><b id="specName"></b><span class="sh"><kbd>A</kbd><kbd>D</kbd> trocar</span></div>
+    <div id="netHud"><span id="pingTxt"></span></div>
+    <div id="roundTimer" class="hidden"></div>
+    <div id="roster"></div>
+  </div>
+
+  <div id="banner" class="hidden"><h2 id="bTitle"></h2><p id="bSub"></p><div id="bResults"></div></div>
+
+  <div id="lobby" class="hidden">
+    <div class="box">
+      <h2>Sala online</h2>
+      <p id="lobbyCode" class="lcode" title="Toque para copiar o link da sala"></p>
+      <p id="lobbyCount" class="lcount"></p>
+      <p id="lobbyCfg" class="lcfg"></p>
+      <div id="lobbyList"></div>
+      <p id="lobbyHint" class="lhint"></p>
+      <button id="btnStart" class="btn primary" disabled>Iniciar partida</button>
+      <button id="btnLobbyLeave" class="btn danger">Sair da sala</button>
+    </div>
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="box">
+      <h2>Pausado</h2>
+      <button id="btnResume" class="btn primary">Voltar ao jogo</button>
+      <button id="btnOptsPause" class="btn" type="button">Opções</button>
+      <button id="btnTouchPause" class="btn touchonly" type="button">Ajustar controles</button>
+      <button id="btnLeave" class="btn danger">Sair da partida</button>
+    </div>
+  </div>
+
+  <!-- abertura / tela de título: cavaleiro sob a lua, logo e "INICIAR JOGO" (ESPAÇO entra no menu) -->
+  <div id="intro">
+    <canvas id="introCv"></canvas>
+    <button id="introSkip" type="button" tabindex="-1" aria-label="Iniciar jogo"></button>
+  </div>
+
+  <!-- menu principal (estilo Dreamcast: painel de vidro azul, botões chanfrados) -->
+  <div id="menu" class="hidden">
+    <div class="dc-bg" aria-hidden="true"></div>
+    <section class="panel">
+      <header class="dc-head">
+        <h1><span class="t1">7</span><span class="t2">SHADOWS</span></h1>
+        <p class="tag">Cada arma tira a sua parte da vida. Entre pela porta e faça a sua jogada.</p>
+      </header>
+
+      <div class="tabs hidden" role="tablist">
+        <button id="tabBtnPlay" class="tab" role="tab" aria-selected="true" aria-controls="tabPlay" type="button">Jogar</button>
+        <button id="tabBtnMusic" class="tab" role="tab" aria-selected="false" aria-controls="tabMusic" type="button">Músicas</button>
+      </div>
+
+      <div id="tabPlay" role="tabpanel">
+        <h2 class="dc-title">Selecione uma opção.</h2>
+        <div class="dc-list">
+          <div class="dc-row">
+            <label class="dc-btn dc-static" for="nameInput">Nome</label>
+            <div class="dc-bar"><input id="nameInput" maxlength="14" placeholder="Shadow 4" autocomplete="off" spellcheck="false"></div>
+          </div>
+          <div class="dc-sep"></div>
+          <div class="dc-row">
+            <button id="btnJoinRoom" class="dc-btn" type="button"><b>Entrar</b></button>
+            <div class="dc-bar"><input id="roomInput" maxlength="4" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Código da sala"></div>
+          </div>
+          <div class="dc-row">
+            <button id="btnCreateRoom" class="dc-btn dc-main" type="button"><b>Criar sala</b></button>
+            <div class="dc-bar dc-desc">privada · convide por código</div>
+          </div>
+          <div class="dc-row">
+            <button id="btnBot" class="dc-btn" type="button"><b>Vs Bot</b></button>
+            <div class="dc-bar">
+              <select id="diffSel" aria-label="Dificuldade do bot">
+                <option value="EASY">Fácil</option>
+                <option value="NORMAL" selected>Normal</option>
+                <option value="HARD">Difícil</option>
+              </select>
+            </div>
+          </div>
+          <div class="dc-sep"></div>
+          <div class="dc-row">
+            <button id="btnShadows" class="dc-btn" type="button"><b>Shadows</b></button>
+            <div class="dc-bar dc-desc">veja todos os personagens</div>
+          </div>
+          <div class="dc-row">
+            <button id="btnMusic" class="dc-btn" type="button"><b>Músicas</b></button>
+            <div class="dc-bar dc-desc">escolha a trilha</div>
+          </div>
+          <div class="dc-row">
+            <button id="btnOptions" class="dc-btn" type="button"><b>Opções</b></button>
+            <div class="dc-bar dc-desc" id="optDesc">tremor, tela, som e teclas</div>
+          </div>
+        </div>
+        <div id="status" role="status"></div>
+      </div>
+
+      <div id="tabMusic" role="tabpanel" class="hidden">
+        <h2 class="dc-title">Escolha a trilha.</h2>
+        <div id="trackList"></div>
+        <label class="vol">Volume <input type="range" id="volRange" min="0" max="100" step="1"></label>
+        <p class="mtip small" id="hintMusicKeys">Durante a partida, aperte <kbd>N</kbd> para trocar de faixa e <kbd>M</kbd> para mutar.</p>
+        <button id="btnMusicBack" class="dc-btn dc-back" type="button"><b>Voltar</b></button>
+      </div>
+
+      <div id="tabShadows" role="tabpanel" class="hidden">
+        <h2 class="dc-title">Escolha o seu Shadow.</h2>
+        <div id="shadowList"></div>
+        <button id="btnShadowsBack" class="dc-btn dc-back" type="button"><b>Voltar</b></button>
+      </div>
+
+      <footer class="dc-foot" aria-hidden="true">
+        <span class="kb"><b>Enter</b> - Confirmar</span><i></i><span class="kb"><b>Esc</b> - Voltar</span><span class="tc">Toque para escolher</span>
+      </footer>
+    </section>
+  </div>
+
+  <!-- configurações da sala (aparece ao tocar em "Criar sala") -->
+  <div id="roomCfg" class="hidden" role="dialog" aria-modal="true" aria-label="Configurar sala">
+    <div class="box">
+      <h2>Configurar sala</h2>
+      <div class="osec">
+        <h3>Partida</h3>
+        <div class="orow"><span>Fase</span><select id="rcMap"></select></div>
+        <div class="orow"><span>Rodadas para vencer</span><select id="rcWin"></select></div>
+        <div class="orow"><span>Tempo máx. da rodada</span><select id="rcTime"></select></div>
+        <div class="orow"><span>Máx. de jogadores</span><select id="rcMax"></select></div>
+      </div>
+      <div class="osec">
+        <h3>Regras</h3>
+        <div class="orow"><span>Armas no mapa</span><select id="rcWeap"></select></div>
+        <div class="orow"><label class="chk"><input type="checkbox" id="rcHeal"> Cura liberada (tecla Q)</label></div>
+      </div>
+      <p class="rcnote">Se o tempo da rodada acabar, vence quem estiver com mais vida. Empate na vida = ninguém pontua.</p>
+      <button id="btnRcCreate" class="btn primary" type="button">Criar sala</button>
+      <button id="btnRcBack" class="btn" type="button">Voltar</button>
+    </div>
+  </div>
+
+  <!-- configurações da partida contra bots (aparece ao tocar em "Vs Bot") -->
+  <div id="botCfg" class="hidden" role="dialog" aria-modal="true" aria-label="Configurar partida contra bots">
+    <div class="box">
+      <h2>Vs Bot</h2>
+      <div class="osec">
+        <h3>Partida</h3>
+        <div class="orow"><span>Dificuldade</span><select id="bcDiff"></select></div>
+        <div class="orow"><span>Fase</span><select id="bcMap"></select></div>
+        <div class="orow"><span>Quantidade de bots</span><select id="bcCount"></select></div>
+        <div class="orow"><span>Rodadas para vencer</span><select id="bcWin"></select></div>
+        <div class="orow"><span>Tempo máx. da rodada</span><select id="bcTime"></select></div>
+      </div>
+      <div class="osec">
+        <h3>Regras</h3>
+        <div class="orow"><span>Armas no mapa</span><select id="bcWeap"></select></div>
+        <div class="orow"><label class="chk"><input type="checkbox" id="bcHeal"> Cura liberada (tecla Q)</label></div>
+      </div>
+      <p class="rcnote" id="bcNote">Com 0 bots você treina sozinho, sem fim de rodada.</p>
+      <button id="btnBcStart" class="btn primary" type="button">Começar</button>
+      <button id="btnBcBack" class="btn" type="button">Voltar</button>
+    </div>
+  </div>
+
+  <div id="opts" class="hidden" role="dialog" aria-modal="true" aria-label="Opções">
+    <div class="box">
+      <h2>Opções</h2>
+      <div class="otabs" role="tablist">
+        <button id="otabGeneral" class="otab" role="tab" aria-selected="true" type="button">Geral</button>
+        <button id="otabKeys" class="otab" role="tab" aria-selected="false" type="button">Teclas</button>
+      </div>
+
+      <div id="optGeneral">
+        <div class="osec" id="optTouchSec">
+          <h3>Controles de toque</h3>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optTouchFixed"> Travar analógicos no lugar</label></div>
+          <button id="btnTouchEdit" class="btn" type="button">Ajustar controles</button>
+        </div>
+        <div class="osec">
+          <h3>Tela</h3>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optShake"> Tremor de tela</label></div>
+          <div class="orow"><span>Intensidade do tremor</span><input type="range" id="optShakeAmt" min="10" max="150" step="5"><output id="optShakeAmtV"></output></div>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optKick"> Impacto ao acertar (piscada, zoom e pausa)</label></div>
+          <div class="orow"><span>Zoom da câmera</span><input type="range" id="optZoom" min="70" max="140" step="5"><output id="optZoomV"></output></div>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optCrt"> Filtro CRT</label></div>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optPing"> Mostrar ping</label></div>
+        </div>
+        <div class="osec">
+          <h3>Som</h3>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optMusic"> Música</label></div>
+          <div class="orow"><span>Volume da música</span><input type="range" id="optVol" min="0" max="100" step="1"><output id="optVolV"></output></div>
+          <div class="orow"><label class="chk"><input type="checkbox" id="optSfx"> Efeitos sonoros</label></div>
+          <div class="orow"><span>Volume dos efeitos</span><input type="range" id="optSfxVol" min="0" max="100" step="1"><output id="optSfxVolV"></output></div>
+        </div>
+      </div>
+
+      <div id="optKeysPane" class="hidden">
+        <p class="mtip small">Clique numa tecla e aperte a nova. Se ela já estiver em uso, as duas trocam de lugar. Mouse (atirar e arremessar) e <kbd>ESC</kbd> (pausar) são fixos.</p>
+        <div id="keyList"></div>
+        <button id="btnKeysReset" class="btn" type="button">Restaurar teclas padrão</button>
+      </div>
+
+      <button id="btnOptsClose" class="btn primary" type="button">Fechar</button>
+    </div>
+  </div>
+
+  <div id="crt"></div>
+  <script src="shared.js"></script>
+  <script src="game.js"></script>
+  <script src="touch.js"></script>
+  <script src="menu-dc.js"></script>
+</body>
+</html>
