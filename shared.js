@@ -40,6 +40,7 @@
   const ACT_CD = 3;          // recarga (s)
   /* ===== SHADOW 4: ATIVA = GANCHO. Prende no adversário mais perto da mira e se puxa até ele ===== */
   const HOOK_RANGE = 560;    // alcance do gancho (px)
+  const HOOK_HIT_W = PR * 4.5;   // largura da colisão da corda (distância lateral máxima do alvo à linha da mira): quanto maior, mais fácil de acertar
   const HOOK_MIN = 80;       // mais perto que isso já está na distância do golpe: não precisa de gancho
   const HOOK_CONE = 0.5;     // tolerância de mira (rad, ~29°) — pega quem estiver mais perto da direção que você aponta
   const HOOK_SPEED = 1700;   // velocidade da puxada (px/s)
@@ -87,6 +88,8 @@
     const a = p.inv[p.sel], b = p.inv[1 - p.sel];
     return !!(a && b && WEAPONS[a.type] && sameWeaponType(a.type, b.type));
   };
+  // golpes extras do combo do Shadow 7 (armas gerais): 3 = giro 360°, 4 = perfuração dupla (longa e estreita), 5 = martelada (pesada e lenta)
+  const DUAL_MOVES = { 3: { r: 1.0, ar: Math.PI * 2, dm: 1.15, cd: 1.1 }, 4: { r: 1.45, ar: 0.55, dm: 1.3, cd: 0.95 }, 5: { r: 1.1, ar: 1.3, dm: 1.8, cd: 1.35 } };
   const dualPair = p => {   // [arma da mão, arma do outro espaço] se o modo dupla está ligado e as duas armas são do mesmo tipo; senão null
     return p && p.dualOn && canDual(p) ? [p.inv[p.sel], p.inv[1 - p.sel]] : null;
   };
@@ -1074,30 +1077,35 @@
         let dFin = false, dSpr = false, dBot = false;
         if (dp) {
           const spr = p.weapon.type === 'SPEAR', bot = isBottle(p.weapon.type);
-          cN = bot ? 5 : 3; cK = p.dcT > 0 ? (p.dc | 0) % cN : 0;
-          const fin = cK === cN - 1; dStep = fin ? 2 : cK % 2; dFin = fin; dSpr = spr; dBot = bot;
+          cN = bot ? 5 : spr ? 3 : 6; cK = p.dcT > 0 ? (p.dc | 0) % cN : 0;
+          // armas gerais: combo de 6 golpes = direita, esquerda, GIRO (360°), PERFURAÇÃO dupla, MARTELADA e o CRUZADO final
+          const fin = cK === cN - 1; dStep = fin ? 2 : (spr || bot) ? cK % 2 : [0, 1, 3, 4, 5][cK]; dFin = fin; dSpr = spr; dBot = bot;
           if (fin) {
             if (spr) { mRange *= 1.3; mDmg *= 1.7; mCd *= 1.25; }
             else if (bot) { mRange *= 1.2; mArc *= 1.5; mDmg *= 1.6; mCd *= 1.3; }
             else { mRange *= 1.2; mArc *= 1.5; mDmg *= 1.6; mCd *= 1.25; }
+          } else if (dStep >= 3) {
+            const mv = DUAL_MOVES[dStep]; mRange *= mv.r; mArc = mv.ar; mDmg *= mv.dm; mCd *= mv.cd;
           } else {
             mCd *= bot ? 0.8 : 0.7;
             if (spr && dStep === 1) { mArc = 1.9; mRange *= 0.85; }   // lança: o 2º golpe é um SLASH (varrida larga, alcance um pouco menor) com a lança esquerda
           }
         }
         // MODO DUPLA: cada arma tem o SEU alcance, arco e dano; o ritmo é o da mais lenta das duas
-        const hands = (dp ? [wd, WEAPONS[dp[1].type] || wd] : [wd]).map(w => {
+        // moveset: golpe 0 = SÓ a mão direita, golpe 1 = SÓ a esquerda (cada uma com a própria arma); o finalizador cruzado usa as duas
+        const hands = (dp ? (dFin || dStep >= 3 ? [wd, WEAPONS[dp[1].type] || wd] : [dStep === 1 ? (WEAPONS[dp[1].type] || wd) : wd]) : [wd]).map(w => {
           let r = w.range, ar = w.arc, dm = w.dmg;
           if (dp) {
             if (dFin) { if (dSpr) { r *= 1.3; dm *= 1.7; } else { r *= 1.2; ar *= 1.5; dm *= dBot ? 1.6 : 1.6; } }
+            else if (dStep >= 3) { const mv = DUAL_MOVES[dStep]; r *= mv.r; ar = mv.ar; dm *= mv.dm; }
             else if (dSpr && dStep === 1) { ar = 1.9; r *= 0.85; }
           }
           return { w, r, ar, dm };
         });
-        if (dp) mCd *= Math.max(...hands.map(h => h.w.cd)) / wd.cd;
+        if (dp) mCd *= Math.max(...hands.map(h => h.w.cd)) / wd.cd;   // golpe de uma mão só: ritmo da arma que bateu
         p.cd = mCd * cadMulOf(p.skin, p.dualOn) * (p.fxCad || 1); p.swing = 0.2;
         if (dp) { p.dc = (cK + 1) % cN; p.dcT = mCd + 0.5; }
-        this.events.push({ t: 'swing', by: p.id, w: p.weapon ? p.weapon.type : 'FISTS', x: p.x, y: p.y, a: p.angle, dc: dStep });
+        this.events.push({ t: 'swing', by: p.id, w: p.weapon ? p.weapon.type : 'FISTS', x: p.x, y: p.y, a: p.angle, dc: dStep, w2: dp ? dp[1].type : undefined });
         // o golpe atinge todos os adversários dentro do arco
         let hitAny = false;
         for (const o of this.players) {
@@ -1262,7 +1270,7 @@
       for (const o of this.players) {
         if (!o || o === p || !o.alive) continue;
         const dx = o.x - p.x, dy = o.y - p.y, along = dx * cx + dy * cy, perp = Math.abs(dx * cy - dy * cx);
-        if (along < HOOK_MIN || along - PR * 0.5 > maxD || perp > PR + 4) continue;
+        if (along < HOOK_MIN || along - PR * 1.5 > maxD || perp > HOOK_HIT_W) continue;   // alcance = distância do cursor; cursor em cima do corpo do alvo (até a borda) já alcança
         if (along - PR * 0.5 > wallD) continue;   // tem parede na frente dele
         if (along < bd) { bd = along; best = o; }
       }
@@ -1804,5 +1812,5 @@
     }
   }
 
-  return { COIN_FX, COIN_T, DIVE_AIR, ROOM_DEFAULTS, sanitizeRoomCfg, TILE, PR, CS, SPEED, WIN_SCORE, DOWN_TIME, MAX_HP, HEAL_PCT, HEAL_TIME, HEAL_SLOW, SKIN_STATS, hasActive, hasHook, hasDual, cadMulOf, canDual, dualFwdOf, DUAL_FWD, dualPair, WEAPON_TYPES, weaponTypeOf, sameWeaponType, speedMulOf, dmgTakenOf, canHold, activeCdOf, spearChargeOf, HOOK_RANGE, HOOK_STOP, maxHpOf, healPctOf, healTimeOf, ACT_COST, ACT_MULT, ACT_RADIUS, ACT_CD, WATER_SLOW, FISH_WATER_FAST, BLADE_CHANCE, bladeChanceOf, WEIGHT, throwFactor, SPEAR_CHARGE, SPEAR_THROW_MIN, SPEAR_THROW_MAX, DOOR_HT, DOOR_LIM, MAX_PLAYERS, MIN_PLAYERS, randomColor, WEAPONS, itemDist, itemDistOn, PICK_R, SW_REACH, isBottle, MAPS, MAP_IDS, Level, Game, Bot, stepMove, ITEM_EXT, canMove, angDiff };
+  return { COIN_FX, COIN_T, DIVE_AIR, ROOM_DEFAULTS, sanitizeRoomCfg, TILE, PR, CS, SPEED, WIN_SCORE, DOWN_TIME, MAX_HP, HEAL_PCT, HEAL_TIME, HEAL_SLOW, SKIN_STATS, hasActive, hasHook, hasDual, cadMulOf, canDual, dualFwdOf, DUAL_FWD, dualPair, WEAPON_TYPES, weaponTypeOf, sameWeaponType, speedMulOf, dmgTakenOf, canHold, activeCdOf, spearChargeOf, HOOK_RANGE, HOOK_STOP, HOOK_HIT_W, maxHpOf, healPctOf, healTimeOf, ACT_COST, ACT_MULT, ACT_RADIUS, ACT_CD, WATER_SLOW, FISH_WATER_FAST, BLADE_CHANCE, bladeChanceOf, WEIGHT, throwFactor, SPEAR_CHARGE, SPEAR_THROW_MIN, SPEAR_THROW_MAX, DOOR_HT, DOOR_LIM, MAX_PLAYERS, MIN_PLAYERS, randomColor, WEAPONS, itemDist, itemDistOn, PICK_R, SW_REACH, isBottle, MAPS, MAP_IDS, Level, Game, Bot, stepMove, ITEM_EXT, canMove, angDiff };
 });

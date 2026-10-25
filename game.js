@@ -4,7 +4,7 @@
    Online 1v1 (servidor autoritativo + predição/reconciliação) ou treino vs bot
    (a mesma simulação roda localmente). Estilo Hotline Miami: um tiro = morte.
    ========================================================================== */
-const { TILE, PR, CS, WEAPONS, MAPS, Level, Game, Bot, stepMove, ITEM_EXT, canMove, angDiff, DOWN_TIME, MAX_HP, HEAL_PCT, HEAL_TIME, HEAL_SLOW, maxHpOf, healTimeOf, hasActive, cadMulOf, ACT_CD, activeCdOf, canHold, hasHook, hasDual, dualFwdOf, HOOK_RANGE, HOOK_STOP, MAX_PLAYERS, MIN_PLAYERS, randomColor, SPEAR_THROW_MIN, SPEAR_THROW_MAX, itemDist, itemDistOn, PICK_R, SW_REACH, isBottle, DOOR_HT, sanitizeRoomCfg } = Shared;
+const { TILE, PR, CS, WEAPONS, MAPS, Level, Game, Bot, stepMove, ITEM_EXT, canMove, angDiff, DOWN_TIME, MAX_HP, HEAL_PCT, HEAL_TIME, HEAL_SLOW, maxHpOf, healTimeOf, hasActive, cadMulOf, ACT_CD, activeCdOf, canHold, hasHook, hasDual, dualFwdOf, HOOK_RANGE, HOOK_STOP, HOOK_HIT_W, MAX_PLAYERS, MIN_PLAYERS, randomColor, SPEAR_THROW_MIN, SPEAR_THROW_MAX, itemDist, itemDistOn, PICK_R, SW_REACH, isBottle, DOOR_HT, sanitizeRoomCfg } = Shared;
 const $ = id => document.getElementById(id);
 // celular/tablet: tela de toque sem mouse (ou ?touch=1 para testar no PC)
 const IS_TOUCH = /[?&]touch=1/.test(location.search) || matchMedia('(hover:none) and (pointer:coarse)').matches;
@@ -544,7 +544,12 @@ async function startOnline(opt = { mode: 'quick' }) {
   const tried = opt.tried || [];
   const region = (opt.region && regionById(opt.region)) || regionOrder.find(r => !tried.includes(r.id)) || regionOrder[0];
   curRegion = region; if (!P2P_MODE) status('Conectando' + (REGIONS.length > 1 ? ' · ' + region.name : ' ao servidor') + '…');
-  if (P2P_MODE && typeof Peer === 'undefined') { mode = null; return showMenu('Não carregou a biblioteca de conexão (PeerJS). Verifique a internet e recarregue a página.'); }
+  if (P2P_MODE && typeof Peer === 'undefined') {
+    status('Carregando a conexão…');
+    const ok = await P2P.loadLib();
+    if (tok !== connTok || mode !== 'online') return;
+    if (!ok) { mode = null; return showMenu('Não carregou a biblioteca de conexão (PeerJS). Verifique a internet e tente de novo.'); }
+  }
   try { ws = P2P_MODE ? (opt.mode === 'create' ? P2P.newHostSocket() : P2P.newGuestSocket(opt.room || '')) : new WebSocket(regionUrl(region)); } catch { mode = null; return status('Endereço do servidor inválido.'); }
   const sock = ws;
   sock.onopen = () => {
@@ -1100,7 +1105,7 @@ function handleEvent(e, now) {
     case 'swing': {
       const st = animOf(e.by); st.sw0 = now; st.sw = e.w; st.punch *= -1; st.dc = e.dc != null ? e.dc : -1;
       sfx('swing', e.x, e.y);
-      fx.slashes.push({ x: e.x, y: e.y, a: e.a, t: 1, w: e.w, by: e.by, dir: st.punch, t0: now, dc: st.dc });
+      fx.slashes.push({ x: e.x, y: e.y, a: e.a, t: 1, w: e.w, by: e.by, dir: st.punch, t0: now, dc: st.dc, w2: e.w2 });
       break;
     }
     case 'kill': {
@@ -1825,8 +1830,15 @@ function drawBody(skin, jacket, flat) {
    O sentido alterna a cada golpe (ida e volta), como o taco/faca do jogo original. */
 const SWDUR = { FISTS: 200, KNIFE: 230, MACHETE: 270, AXE: 310, BAT: 340, KATANA: 300, SPEAR: 300, WINE: 260, BROKEN: 210 };
 const swDur = t => SWDUR[t] || 240;
-const dualSwMul = dc => dc === 2 ? 1.2 : dc >= 0 ? 0.8 : 1;   // Shadow 7 com 2 armas melee: golpes 0 e 1 mais rápidos, o cruzado (2) mais lento
+const slashDur = s => !s.w2 || s.dc === 0 ? swDur(s.w) : s.dc === 1 ? swDur(s.w2) : Math.max(swDur(s.w), swDur(s.w2));   // duração do rastro: mão que bateu (cruzado = a mais lenta)
+const dualSwMul = dc => dc === 2 ? 1.2 : dc === 3 ? 1.05 : dc === 4 ? 0.75 : dc === 5 ? 1.4 : dc >= 0 ? 0.8 : 1;   // Shadow 7 com 2 armas melee: golpes 0 e 1 mais rápidos, o cruzado (2) mais lento
 const lerpN = (a, b, t) => a + (b - a) * t;
+// duração base do golpe: no modo dupla, golpe 0 = arma da direita, 1 = arma da esquerda, 2 (cruzado) = a mais lenta das duas
+function dualDur(p, dc) {
+  const w1 = p.w || 'FISTS', iv2 = p.dm === 1 && p.iv && p.iv[1 - (p.se | 0)], w2 = iv2 && iv2[0] ? iv2[0] : w1;
+  if (p.dm !== 1) return swDur(w1);
+  return dc === 1 ? swDur(w2) : dc >= 2 ? Math.max(swDur(w1), swDur(w2)) : swDur(w1);
+}
 function swingAng(sp, arc, dir) {
   const rest = -0.6, a0 = -dir * arc / 2, wind = a0 - dir * 0.45, a1 = dir * arc / 2, over = a1 + dir * 0.18;
   if (sp < 0.16) { const t = sp / 0.16; return lerpN(rest, wind, 1 - (1 - t) * (1 - t)); }
@@ -1890,7 +1902,7 @@ function drawPlayer(p, x, y, ang, isMe, now) {
   if (healing) ctx.scale(0.94, 0.94);   // agachadinho enquanto se cura
   const dancing = !!p.em && !p.dn && !healing;   // emote: dancinha (tudo preso ao relógio, então a galera dança no mesmo ritmo)
   if (dancing) { const bt = now / 230, pul = 1 + 0.05 * Math.abs(Math.sin(bt * 2)); ctx.rotate(Math.sin(bt) * 0.5); ctx.scale(pul, pul); }
-  const swW = st.sw || 'FISTS', swSp = Math.min(1, (now - st.sw0) / (swDur(p.w || 'FISTS') * (p.dm === 1 ? dualSwMul(st.dc) : 1))), swOn = swSp < 1;
+  const swW = st.sw || 'FISTS', swSp = Math.min(1, (now - st.sw0) / (dualDur(p, st.dc) * (p.dm === 1 ? dualSwMul(st.dc) : 1))), swOn = swSp < 1;
   if (swOn && !p.dn && (!p.w || (WEAPONS[p.w] && WEAPONS[p.w].melee))) ctx.translate(swingLunge(swSp) * (p.w === 'SPEAR' ? 5 : p.w ? 8 : 6), 0);   // passada do corpo
   if (p.dn) {
     ctx.globalAlpha = 0.95; drawBody(p.sk, jacket, true); ctx.translate(-3, 0); drawHead(p.sk, p.dk > 0); ctx.globalAlpha = 1;
@@ -1987,12 +1999,31 @@ function drawPlayer(p, x, y, ang, isMe, now) {
       const hx = Math.cos(ha) * len, hy2 = 10 + Math.sin(ha) * len, cnt = Math.sin(Math.min(1, sp / 0.7) * Math.PI);
       if (p.dm === 1) {   // Shadow 7 no modo dupla: COMBO — golpe 0 = só o braço direito, 1 = só o esquerdo (o outro fica de guarda), 2 = CRUZADO: os dois braços varrem juntos com o corpo girando
         const stp = dcs >= 0 ? dcs : 0, both = true;   // as DUAS armas golpeiam em todo golpe
-        twist = both ? (a + 0.6) * 0.5 : (a + 0.6) * 0.3 * (stp === 0 ? 1 : -1);
+        // cada mão usa a SUA arma: duração, arco, alcance do braço e sprite próprios
+        const hcfg = sd => {
+          const w = sd === 1 ? wt : wt2, d = WEAPONS[w] || wd, mul = dualSwMul(st.dc);
+          const spH = Math.min(1, (now - st.sw0) / (swDur(w) * mul));
+          const arcH = (w === 'SPEAR' ? 1.9 : d.arc) * (dcs === 2 ? 1.5 : 1);
+          let aH = swingAng(spH, dcs === 5 ? 1.3 : arcH, dir), rf = Math.max(0.7, Math.min(1.25, d.range / 90));
+          const blH = spH < 0.12 ? spH / 0.12 : spH > 0.85 ? (1 - spH) / 0.15 : 1;
+          let lenH = lerpN(10.2, 10.2 + (swingArm(spH) - 10.2) * rf, blH), yOff = 0;
+          if (dcs === 3) { const e = Math.min(1, spH / 0.85); aH = -0.6 + dir * TAU * (e * e * (3 - 2 * e)); }   // giro: o braço dá a volta completa
+          else if (dcs === 4) {   // perfuração: braços juntos à frente, estocando em linha reta
+            const pr = spH < 0.2 ? -(spH / 0.2) * 0.25 : Math.sin(Math.min(1, (spH - 0.2) / 0.5) * Math.PI / 2) * (spH < 0.7 ? 1 : 1 - (spH - 0.7) / 0.3);
+            aH = 0.05; lenH = 12 + 30 * pr * rf; yOff = -4 * Math.max(0, pr);
+          } else if (dcs === 5) { rf *= 1.1; lenH = lerpN(10.2, 10.2 + (swingArm(spH) - 10.2) * rf, blH); }
+          const haH = dcs === 3 || dcs === 4 ? aH : lerpN(-0.2, aH, blH);
+          return { w, spH, aH, haH, lenH, yOff, on: spH < 1 };
+        };
+        const hc1 = hcfg(1), hc2 = hcfg(-1);
+        twist = dcs === 3 ? (hc1.aH + 0.6) * 0.85 : dcs === 4 ? 0.1 : dcs >= 2 ? ((hc1.aH + hc2.aH) / 2 + 0.6) * 0.5 : ((stp === 0 ? hc1.aH : hc2.aH) + 0.6) * 0.3 * (stp === 0 ? 1 : -1);
         for (const sd of [1, -1]) {
-          const act = both || (stp === 0 ? sd === 1 : sd === -1);
+          const hc = sd === 1 ? hc1 : hc2;
+          const act = hc.on && (dcs >= 2 || (dcs === 1 ? sd === -1 : sd === 1));   // golpe 0 = direita, 1 = esquerda, 2 = cruzado (as duas)
           if (act) {
-            limb(0, sd * 10, hx, sd * hy2, jacket);
-            ctx.save(); ctx.translate(hx, sd * hy2); ctx.rotate(sd * a); ctx.scale(1, sd); drawWeaponSprite(sd === 1 ? wt : wt2); hand(1, 0); ctx.restore();
+            const hxH = Math.cos(hc.haH) * hc.lenH, hyH = 10 + hc.yOff + Math.sin(hc.haH) * hc.lenH;
+            limb(0, sd * 10, hxH, sd * hyH, jacket);
+            ctx.save(); ctx.translate(hxH, sd * hyH); ctx.rotate(sd * hc.aH); ctx.scale(1, sd); drawWeaponSprite(hc.w); hand(1, 0); ctx.restore();
           } else {
             limb(0, sd * 10, 10, sd * hy, jacket);
             ctx.save(); ctx.translate(10, sd * hy); ctx.rotate(sd * -0.6); ctx.scale(1, sd); drawWeaponSprite(sd === 1 ? wt : wt2); hand(1, 0); ctx.restore();
@@ -2316,7 +2347,7 @@ function updateFx(dt) {
   fx.parts = fx.parts.filter(p => p.life > 0);
   if (fx.parts.length > 700) fx.parts.splice(0, fx.parts.length - 700);   // teto de partículas
   for (const l of fx.lights) l.t -= d; fx.lights = fx.lights.filter(l => l.t > 0);
-  fx.slashes = fx.slashes.filter(s => performance.now() - s.t0 < swDur(s.w) + 40);
+  fx.slashes = fx.slashes.filter(s => performance.now() - s.t0 < slashDur(s) * dualSwMul(s.dc) + 40);
   fx.blasts = fx.blasts.filter(b => performance.now() - b.t0 < BLAST_T);
   fx.hooks = fx.hooks.filter(h => performance.now() - h.t0 < HOOK_FX_T);
   if (pbul.length && level) {
@@ -2533,7 +2564,7 @@ function render(now, dt) {
   for (const s of fx.slashes) {
     const wd = WEAPONS[s.w];
     if (!wd || s.w === 'FISTS') continue;
-    const sp = Math.min(1, (performance.now() - s.t0) / (swDur(s.w) * dualSwMul(s.dc))), fade = Math.max(0, 1 - Math.max(0, sp - 0.35) / 0.65);
+    const sp = Math.min(1, (performance.now() - s.t0) / (slashDur(s) * dualSwMul(s.dc))), fade = Math.max(0, 1 - Math.max(0, sp - 0.35) / 0.65);
     if (fade <= 0 || sp < 0.1) continue;
     const pp = s.by === myId ? pred : (interpEnemy(s.by) || s), L = swingLunge(sp) * (s.w === 'SPEAR' ? 5 : 8) * CS;
     ctx.save(); ctx.translate(pp.x + Math.cos(s.a) * L, pp.y + Math.sin(s.a) * L); ctx.rotate(s.a);
@@ -2544,14 +2575,30 @@ function render(now, dt) {
       for (const off of (s.dc === 0 ? [7] : s.dc === 1 ? [-7] : s.dc === 2 ? [7, -7] : [0])) {   // dupla: o rastro sai da lança do lado que estocou
         ctx.globalAlpha = fade * 0.85; ctx.strokeStyle = g; ctx.lineWidth = 5 * fade + 1; ctx.beginPath(); ctx.moveTo(RG * 0.25, off); ctx.lineTo(tip, off); ctx.stroke();
       }
+    } else if (s.dc === 3 && s.w2) {   // GIRO 360°: anel que gira em volta do corpo
+      const R = Math.max(wd.range, (WEAPONS[s.w2] || wd).range) * 0.95, e = Math.min(1, sp / 0.85), head = -0.6 + (s.dir || 1) * TAU * (e * e * (3 - 2 * e)), tl = Math.min(TAU * 0.92, 0.5 + TAU * e);
+      ctx.globalAlpha = fade * 0.5; ctx.fillStyle = wd.col; ctx.beginPath(); ctx.arc(0, 0, R, head - (s.dir || 1) * tl, head, (s.dir || 1) < 0 ? true : false); ctx.arc(0, 0, R * 0.55, head, head - (s.dir || 1) * tl, (s.dir || 1) > 0); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = fade * 0.95; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(0, 0, R, head - (s.dir || 1) * tl, head, (s.dir || 1) < 0); ctx.stroke();
+    } else if (s.dc === 4 && s.w2) {   // PERFURAÇÃO dupla: dois rastros retos e finos, um por arma
+      for (const [hw, off] of [[s.w, 5], [s.w2, -5]]) {
+        const wdH = WEAPONS[hw] || wd, RG = wdH.range * 1.45, tip = RG * (0.5 + 0.5 * Math.sin(Math.min(1, sp / 0.5) * Math.PI / 2)), g = ctx.createLinearGradient(RG * 0.2, 0, tip, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, wdH.col); ctx.shadowColor = wdH.col;
+        ctx.globalAlpha = fade * 0.9; ctx.strokeStyle = g; ctx.lineWidth = 4 * fade + 1; ctx.beginPath(); ctx.moveTo(RG * 0.2, off); ctx.lineTo(tip, off); ctx.stroke();
+      }
     } else {                 // varrida: meia-lua que acompanha a ponta da arma e some
-      const fin = s.dc === 2, arc = s.w === 'SPEAR' ? 1.9 : wd.arc * (fin ? 1.5 : 1), rng = wd.range * (fin ? 1.2 : s.w === 'SPEAR' ? 0.85 : 1);   // lança dupla, 2º golpe = slash
-      const both2 = fin || (s.dc >= 0 && s.w !== 'SPEAR');   // Shadow 7 com duas armas: rastro das duas
-      for (const dir of (both2 ? [s.dir || 1, -(s.dir || 1)] : [s.dir || 1])) {
-        const head = swingAng(Math.min(sp, 0.62), arc, dir), tail = head - dir * Math.min(1.5, arc * 0.7) * (0.35 + 0.65 * Math.min(1, sp / 0.45));
+      const fin = s.dc === 2 || (s.dc === 5 && !!s.w2), slam = s.dc === 5 && !!s.w2;
+      const both2 = fin || (s.dc >= 0 && s.w !== 'SPEAR');   // Shadow 7 com duas armas: rastro das duas, cada um com a sua arma
+      const hands = fin ? [[s.w, s.dir || 1], [s.w2 || s.w, -(s.dir || 1)]] : s.dc === 1 ? [[s.w2 || s.w, -(s.dir || 1)]] : [[s.w, s.dir || 1]];
+      for (const [hw, dir] of hands) {
+        const wdH = WEAPONS[hw] || wd, durH = swDur(hw), durMax = slashDur(s);
+        const spH = Math.min(1, fin ? sp * durMax / durH : sp), fadeH = Math.max(0, 1 - Math.max(0, spH - 0.35) / 0.65);
+        if (fadeH <= 0) continue;
+        const arc = slam ? 1.3 : hw === 'SPEAR' ? 1.9 : wdH.arc * (fin ? 1.5 : 1), rng = wdH.range * (slam ? 1.1 : fin ? 1.2 : hw === 'SPEAR' ? 0.85 : 1);   // lança dupla, 2º golpe = slash
+        const head = swingAng(Math.min(spH, 0.62), arc, dir), tail = head - dir * Math.min(1.5, arc * 0.7) * (0.35 + 0.65 * Math.min(1, spH / 0.45));
         const r1 = rng * 0.95, r0 = rng * 0.5, a0 = Math.min(head, tail), a1 = Math.max(head, tail);
-        ctx.globalAlpha = fade * 0.55; ctx.fillStyle = wd.col; ctx.beginPath(); ctx.arc(0, 0, r1, a0, a1); ctx.arc(0, 0, r0, a1, a0, true); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = fade * 0.95; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(0, 0, r1, a0, a1); ctx.stroke();
+        ctx.shadowColor = wdH.col;
+        ctx.globalAlpha = fadeH * 0.55; ctx.fillStyle = wdH.col; ctx.beginPath(); ctx.arc(0, 0, r1, a0, a1); ctx.arc(0, 0, r0, a1, a0, true); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = fadeH * 0.95; ctx.strokeStyle = '#fff'; ctx.lineWidth = slam ? 4.5 : 2.6; ctx.beginPath(); ctx.arc(0, 0, r1, a0, a1); ctx.stroke();
       }
     }
     ctx.restore();
@@ -2648,6 +2695,16 @@ function render(now, dt) {
       const cdl = me.sq || 0, t = cdl > 0 ? 'GANCHO ' + cdl.toFixed(1) + 's' : 'GANCHO · ' + (IS_TOUCH ? 'ATIRE' : 'CLIQUE');
       ctx.save(); ctx.font = '700 12px Rajdhani, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = cdl > 0 ? '#c9b3e0' : '#9fe6ff';
       ctx.strokeText(t, pred.x, pred.y - 89); ctx.fillText(t, pred.x, pred.y - 89); ctx.restore();
+      if (!IS_TOUCH) {   // marca até onde o gancho vai: o alcance é a distância do cursor (mín. HOOK_MIN, máx. HOOK_RANGE)
+        const ha = aimAngle(), hd0 = Math.hypot(mouse.x - (W / 2 + (pred.x - cam.x) * Z), mouse.y - (H / 2 + (pred.y - cam.y) * Z)) / Z, hd = Math.max(80, Math.min(HOOK_RANGE, hd0)), rdy = cdl <= 0;
+        const ex = pred.x + Math.cos(ha) * hd, ey = pred.y + Math.sin(ha) * hd;
+        ctx.save(); ctx.globalAlpha = rdy ? 0.16 : 0.07; ctx.strokeStyle = rdy ? '#9fe6ff' : '#c9b3e0'; ctx.lineWidth = HOOK_HIT_W * 2; ctx.lineCap = 'butt';   // faixa GORDA: tudo que estiver dentro dela é agarrado (não precisa mirar certinho)
+        ctx.beginPath(); ctx.moveTo(pred.x + Math.cos(ha) * 24, pred.y + Math.sin(ha) * 24); ctx.lineTo(ex, ey); ctx.stroke(); ctx.restore();
+        ctx.save(); ctx.globalAlpha = rdy ? 0.75 : 0.3; ctx.strokeStyle = rdy ? '#9fe6ff' : '#c9b3e0'; ctx.lineWidth = 1.6; ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(pred.x + Math.cos(ha) * 24, pred.y + Math.sin(ha) * 24); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.setLineDash([]); ctx.beginPath(); ctx.arc(ex, ey, 7, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex - 11, ey); ctx.lineTo(ex + 11, ey); ctx.moveTo(ex, ey - 11); ctx.lineTo(ex, ey + 11); ctx.stroke(); ctx.restore();
+      }
     }
     ctx.restore();
   }
@@ -2987,7 +3044,7 @@ requestAnimationFrame(frame);
    loop (anoitecer → dia → noite…) até o jogador apertar ESPAÇO (ou Enter / clique / toque). Tudo desenhado em canvas. */
 const introEl = $('intro'), icv = $('introCv'), ic = icv.getContext('2d');
 let iW = 0, iH = 0, iD = 1, introOn = true, introT = 0, introLast = performance.now(), introGo = -1, introSkipAt = 0, introDust = [], introShot = '';
-let bootOn = true, bootDoneAt = 0;   // tela de carregamento (N64) na frente: a abertura e a música só começam quando ela acaba e o jogador aperta uma tecla
+let bootOn = !!(window.__boot && !window.__boot.done), bootDoneAt = 0;   // tela de carregamento (N64) na frente: a abertura e a música só começam quando ela acaba e o jogador aperta uma tecla
 let sunCv = null, sunR = 0, moonCv = null, logoCv = null, logoFs = 0, logoW = 0, logoH = 0, shineCv = null;
 const IT_CUT1 = 2.8,        // segundos: corte da serra (câmera 1) para o cavaleiro vindo do fundo (câmera 2)
   IT_FLASH = 6.0,           // segundos: clarão + surge o logo
@@ -3534,6 +3591,7 @@ function introFrame(now) {
   if (!introOn) return;
   requestAnimationFrame(introFrame);
   if (bootOn) { introLast = now; return; }   // carregando: a animação espera
+  if (IS_TOUCH && now - introLast < 28) return;   // celular: abertura a ~30 fps (a animação usa o tempo real, só gasta metade da bateria)
   const dt = Math.min(0.05, (now - introLast) / 1000); introLast = now; introT += dt;
   drawIntro(introT, dt);
   if (introGo >= 0 && introT - introGo >= IT_GO) endIntro();   // acabou o efeito: abre o menu
@@ -3580,125 +3638,20 @@ for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, 
 introMusicTick();
 
 /* ------------------------------------------------ TELA DE CARREGAMENTO (estilo N64)
-   Fundo preto, cubo 3D colorido girando com reflexo no chão, barra de progresso nas quatro cores. Espera as fontes, a página e as duas músicas
-   (abertura e menu) carregarem — no mínimo ~2,8 s — e então pede "PRESSIONE QUALQUER TECLA". Esse toque libera o áudio do navegador:
-   a tela some num clarão e a abertura começa do zero JUNTO com a música. */
-(function bootScreen() {
-  const ov = document.createElement('div'); ov.id = 'boot';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:60;background:#000;transition:opacity .5s ease;cursor:default;touch-action:manipulation;user-select:none;-webkit-user-select:none';
-  const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
-  ov.appendChild(cv); document.body.appendChild(ov);
-  const c = cv.getContext('2d'), touchDev = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  let W = 0, H = 0, D = 1;
-  const fit = () => { D = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * D); cv.height = Math.round(H * D); };
-  fit(); addEventListener('resize', fit);
-
-  // ---- progresso real: fontes, página e as duas músicas (cada item tem tempo máximo, para nunca travar)
-  const wait = (arm, ms) => new Promise(res => { let d = false; const f = () => { if (!d) { d = true; res(); } }; try { arm(f); } catch { f(); } setTimeout(f, ms); });
-  const audioReady = (el, ms) => wait(f => { if (el.readyState >= 3) return f(); el.addEventListener('canplay', f, { once: true }); el.addEventListener('error', f, { once: true }); }, ms);
-  const tasks = [
-    wait(f => (document.fonts && document.fonts.ready ? document.fonts.ready.then(f) : f()), 5000),
-    wait(f => (document.readyState === 'complete' ? f() : addEventListener('load', f, { once: true })), 8000),
-    audioReady(introBgm, 5000), audioReady(menuBgm, 5000)
-  ];
-  let real = 0; for (const p of tasks) p.then(() => { real++; });
-  const T0 = performance.now(), MIN = 2.8;
-  let shown = 0, ready = false, finishing = false, flashT = 0, last = T0, raf = 0;
-
-  // ---- cubo 3D (cores do logo do console: vermelho, verde, azul, amarelo; topo e base em cinza)
-  const COLS = ['#e53935', '#3fae49', '#2f7be8', '#f9c80e'];
-  const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-  const FACES = [
-    { n: [0, 0, -1], v: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]], c: 0 },
-    { n: [0, 0, 1], v: [[1, -1, 1], [-1, -1, 1], [-1, 1, 1], [1, 1, 1]], c: 2 },
-    { n: [1, 0, 0], v: [[1, -1, -1], [1, -1, 1], [1, 1, 1], [1, 1, -1]], c: 1 },
-    { n: [-1, 0, 0], v: [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1]], c: 3 },
-    { n: [0, -1, 0], v: [[-1, -1, 1], [1, -1, 1], [1, -1, -1], [-1, -1, -1]], c: -1 },
-    { n: [0, 1, 0], v: [[-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]], c: -1 }
-  ];
-  function drawCube(cx, cy, s, ry, rx) {
-    const cyA = Math.cos(ry), syA = Math.sin(ry), cxA = Math.cos(rx), sxA = Math.sin(rx), F = 6;
-    const rot = (x, y, z) => { const x1 = x * cyA + z * syA, z1 = -x * syA + z * cyA; return [x1, y * cxA - z1 * sxA, y * sxA + z1 * cxA]; };
-    const vis = [];
-    for (const f of FACES) {
-      const n = rot(...f.n); if (n[2] >= 0) continue;   // de costas para a câmera
-      const pts = f.v.map(p => { const r = rot(...p), k = F / (F + r[2]); return [cx + r[0] * k * s, cy + r[1] * k * s, r[2]]; });
-      vis.push({ f, n, pts, z: pts.reduce((a, p) => a + p[2], 0) / 4 });
-    }
-    vis.sort((a, b) => b.z - a.z);
-    for (const q of vis) {
-      const lam = Math.max(0, -q.n[0] * 0.45 - q.n[1] * 0.6 - q.n[2] * 0.66), br = 0.42 + 0.78 * lam;
-      const base = q.f.c >= 0 ? rgb(COLS[q.f.c]) : [150, 156, 170];
-      c.fillStyle = `rgb(${Math.min(255, base[0] * br) | 0},${Math.min(255, base[1] * br) | 0},${Math.min(255, base[2] * br) | 0})`;
-      c.beginPath(); c.moveTo(q.pts[0][0], q.pts[0][1]); for (let i = 1; i < 4; i++) c.lineTo(q.pts[i][0], q.pts[i][1]); c.closePath(); c.fill();
-      c.strokeStyle = 'rgba(0,0,0,.4)'; c.lineWidth = Math.max(1, s * 0.03); c.stroke();
-      c.strokeStyle = `rgba(255,255,255,${0.1 + 0.3 * lam})`; c.lineWidth = Math.max(1, s * 0.02); c.beginPath(); c.moveTo(q.pts[0][0], q.pts[0][1]); c.lineTo(q.pts[1][0], q.pts[1][1]); c.stroke();
-    }
-  }
-
-  function frame(now) {
-    raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    const el = (now - T0) / 1000, target = Math.min(real / tasks.length, el / MIN);
-    shown += (target - shown) * Math.min(1, dt * 5); if (shown > 0.995 && target >= 1) shown = 1;
-    if (!ready && shown >= 1 && el >= MIN) ready = true;
-
-    const t = el, m = Math.min(W, H), s = m * (W < H ? 0.17 : 0.14);
-    c.setTransform(D, 0, 0, D, 0, 0); c.globalAlpha = 1; c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-    const cx = W / 2, cy = H * 0.37 + Math.sin(t * 2.2) * s * 0.07;
-    // brilho atrás do cubo
-    const gl = c.createRadialGradient(cx, cy, s * 0.3, cx, cy, s * 3.4); gl.addColorStop(0, 'rgba(120,150,255,.22)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = gl; c.fillRect(0, 0, W, H);
-    const spin = t * (ready ? 2.4 : 1.5), tilt = 0.55 + Math.sin(t * 0.9) * 0.28, floorY = cy + s * 1.95;
-    // reflexo no chão
-    c.save(); c.beginPath(); c.rect(0, floorY, W, H); c.clip(); c.translate(0, floorY * 2); c.scale(1, -1); c.globalAlpha = 0.16; drawCube(cx, cy, s, spin, tilt); c.restore();
-    const fg = c.createLinearGradient(0, floorY, 0, floorY + s * 1.6); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,1)'); c.fillStyle = fg; c.fillRect(0, floorY, W, s * 1.7);
-    drawCube(cx, cy, s, spin, tilt);
-
-    // título
-    const fs = Math.max(22, Math.min(W * 0.085, m * 0.1));
-    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `400 ${fs}px Bungee, Impact, sans-serif`;
-    c.shadowColor = 'rgba(120,150,255,.7)'; c.shadowBlur = 18; c.fillStyle = '#fff'; c.fillText('7 SHADOWS', cx, H * 0.665); c.shadowBlur = 0;
-
-    // barra + texto
-    const bw = Math.min(W * 0.72, 440), bh = Math.max(10, m * 0.022), bx = cx - bw / 2, by = H * 0.8;
-    if (!ready) {
-      const dots = '.'.repeat(1 + ((t * 2.5) | 0) % 3);
-      c.font = `400 ${Math.max(13, fs * 0.38)}px Bungee, Impact, sans-serif`; c.fillStyle = '#cfd6ee'; c.textAlign = 'left'; c.fillText('CARREGANDO' + dots, bx, by - bh * 1.7);
-      c.textAlign = 'right'; c.fillText(Math.round(shown * 100) + '%', bx + bw, by - bh * 1.7);
-    }
-    c.fillStyle = '#12141c'; c.strokeStyle = '#8b93ad'; c.lineWidth = 2; c.beginPath(); c.rect(bx, by, bw, bh); c.fill(); c.stroke();
-    c.save(); c.beginPath(); c.rect(bx + 2, by + 2, Math.max(0, (bw - 4) * shown), bh - 4); c.clip();
-    for (let i = 0; i < 4; i++) { c.fillStyle = COLS[i]; c.fillRect(bx + 2 + (bw - 4) * i / 4, by + 2, (bw - 4) / 4 + 1, bh - 4); }
-    c.fillStyle = 'rgba(255,255,255,.28)'; c.fillRect(bx, by + 2, bw, (bh - 4) * 0.4); c.restore();
-    if (ready) {
-      const blink = 0.55 + 0.45 * Math.sin(t * 5);
-      c.textAlign = 'center'; c.font = `400 ${Math.max(14, fs * 0.42)}px Bungee, Impact, sans-serif`; c.globalAlpha = finishing ? 1 : blink; c.fillStyle = '#ffe14f';
-      c.fillText(touchDev ? 'TOQUE NA TELA' : 'PRESSIONE QUALQUER TECLA', cx, by + bh * 3.4); c.globalAlpha = 1;
-    }
-    if (flashT) { c.fillStyle = `rgba(255,255,255,${Math.min(1, (now - flashT) / 180)})`; c.fillRect(0, 0, W, H); }
-  }
-  raf = requestAnimationFrame(frame);
-
-  function finish() {
-    if (finishing) return; finishing = true; flashT = performance.now();
-    removeEventListener('keydown', onKey, true); removeEventListener('pointerdown', onPtr, true); removeEventListener('touchstart', onPtr, true);
+   O cubo vive em boot.js (inline no index.html, aparece antes de tudo). Aqui só ligamos: as duas músicas entram na barra de progresso e,
+   quando o jogador aperta uma tecla/toca, onFinish roda DENTRO desse gesto: libera o áudio e a abertura começa do zero JUNTO com a música. */
+(function bootHook() {
+  const B = window.__boot;
+  if (!B || B.done) { bootOn = false; return; }
+  try { B.audio(introBgm, menuBgm); } catch { }
+  B.onFinish = () => {
     bootDoneAt = performance.now(); bootOn = false;
     try { initAudio(); } catch { }
-    introT = 0; introLast = performance.now();   // abertura e música começam juntas, do zero
-    try { introBgm.volume = 0; const pr = introBgm.play(); if (pr && pr.catch) pr.catch(() => { }); } catch { }   // o play() tem que sair DENTRO do toque (Safari); o volume sobe no tick
+    introT = 0; introLast = performance.now();
+    try { introBgm.volume = 0; const pr = introBgm.play(); if (pr && pr.catch) pr.catch(() => { }); } catch { }   // o volume sobe no tick
     introMusicTick();
-    setTimeout(() => { ov.style.opacity = '0'; ov.style.pointerEvents = 'none'; }, 180);
-    setTimeout(() => { cancelAnimationFrame(raf); ov.remove(); removeEventListener('resize', fit); }, 800);
-  }
-  const onKey = e => {
-    e.stopImmediatePropagation();   // enquanto carrega, o jogo não recebe teclas
-    if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key) || /^F\d+$/.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === ' ' || e.key === 'Enter' || e.key.startsWith('Arrow')) e.preventDefault();
-    if (ready) finish();
+    setTimeout(() => { try { P2P.loadLib(); } catch { } }, 3000);   // PeerJS só é baixado depois, em segundo plano (não pesa no carregamento)
   };
-  const onPtr = e => { e.stopImmediatePropagation(); if (ready) finish(); };
-  addEventListener('keydown', onKey, true); addEventListener('pointerdown', onPtr, true); addEventListener('touchstart', onPtr, { capture: true, passive: true });
 })();
 
 /* ------------------------------------------------ MENU: música */

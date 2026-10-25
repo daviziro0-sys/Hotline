@@ -267,6 +267,19 @@ const P2P = (() => {
     close() { if (this.done) return; this.finish(false); }
   }
 
-  return { newHostSocket: () => new LoopSocket(), newGuestSocket: code => new PeerSocket(code), Host };
+  // PeerJS sob demanda: só baixa quando for jogar online (ou em segundo plano, depois da abertura). Tenta unpkg e depois jsDelivr.
+  let libP = null;
+  const loadLib = () => typeof Peer !== 'undefined' ? Promise.resolve(true) : libP || (libP = new Promise(res => {
+    const urls = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
+    const next = i => {
+      if (i >= urls.length) { libP = null; return res(false); }
+      const s = document.createElement('script'); s.src = urls[i]; s.async = true;
+      s.onload = () => typeof Peer !== 'undefined' ? res(true) : next(i + 1);
+      s.onerror = () => { s.remove(); next(i + 1); };
+      document.head.appendChild(s);
+    };
+    next(0);
+  }));
+  return { newHostSocket: () => new LoopSocket(), newGuestSocket: code => new PeerSocket(code), Host, loadLib };
 })();
 if (typeof module === 'object' && module.exports) module.exports = P2P;
