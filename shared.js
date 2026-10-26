@@ -1680,19 +1680,25 @@
   }
 
   /* ------------------------------------------------------------------ BOT */
+  // BFS sem alocação por célula: buffers reutilizados (antes criava arrays [ox,oy] a cada tile visitado => picos de GC)
+  const BFS_DX = [1, -1, 0, 0], BFS_DY = [0, 0, 1, -1];
+  let bfsPrev = null, bfsQ = null, bfsSize = 0;
   function bfs(L, sx, sy, gx, gy) {
-    const W = L.W, H = L.H, prev = new Int16Array(W * H).fill(-1), start = sy * W + sx, goal = gy * W + gx;
+    const W = L.W, H = L.H;
     if (sx < 0 || sy < 0 || sx >= W || sy >= H || gx < 0 || gy < 0 || gx >= W || gy >= H) return [];
-    const q = [start]; prev[start] = start;
-    for (let qi = 0; qi < q.length; qi++) {
-      const c = q[qi]; if (c === goal) break;
+    if (bfsSize !== W * H) { bfsSize = W * H; bfsPrev = new Int32Array(bfsSize); bfsQ = new Int32Array(bfsSize); }
+    const prev = bfsPrev, q = bfsQ, start = sy * W + sx, goal = gy * W + gx, g = L.g;
+    prev.fill(-1);
+    let qh = 0, qt = 0; q[qt++] = start; prev[start] = start;
+    while (qh < qt) {
+      const c = q[qh++]; if (c === goal) break;
       const cx = c % W, cy = (c / W) | 0;
-      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = cx + ox, ny = cy + oy;
+      for (let d = 0; d < 4; d++) {
+        const nx = cx + BFS_DX[d], ny = cy + BFS_DY[d];
         if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
         const k = ny * W + nx;
-        if (prev[k] >= 0 || L.g[ny][nx] === 1 || L.g[ny][nx] === 3) continue;
-        prev[k] = c; q.push(k);
+        if (prev[k] >= 0 || g[ny][nx] === 1 || g[ny][nx] === 3) continue;
+        prev[k] = c; q[qt++] = k;
       }
     }
     if (prev[goal] < 0) return [];
@@ -1706,7 +1712,7 @@
       this.g = game; this.slot = slot;
       const D = { EASY: { turn: 3.2, react: 0.55, acc: 0.14 }, NORMAL: { turn: 5.5, react: 0.32, acc: 0.07 }, HARD: { turn: 9, react: 0.16, acc: 0.03 } };
       this.d = D[diff] || D.NORMAL;
-      this.ang = slot ? Math.PI : 0; this.path = []; this.pathT = 0; this.seen = 0; this.noise = 0; this.noiseT = 0;
+      this.ang = slot ? Math.PI : 0; this.path = []; this.pathT = Math.random() * 0.25;   // escalonado: os bots não recalculam o caminho no mesmo frame this.seen = 0; this.noise = 0; this.noiseT = 0;
       this.st = 1; this.stT = 0; this.pkCd = 0; this.thCd = 0; this.hlCd = 0; this.swCd = 0;
     }
     think(dt) {

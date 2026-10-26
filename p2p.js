@@ -21,7 +21,7 @@ const P2P = (() => {
     { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
     ...MY_TURN,
   ] } } : { debug: 0 };
-  const RELIABLE = true;                     // OUTCOME usa canal confiável; ponha false para voltar ao modo "sem retransmissão"
+  const RELIABLE = false;                    // false = canal NÃO ORDENADO (sem bloqueio de cabeça de fila: um pacote perdido não trava os seguintes). O cliente descarta snapshots fora de ordem pelo campo "n". Ponha true para voltar ao canal ordenado.
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const SKINS = ["HERO", "ROOSTER", "TIGER", "BEAR", "MONKEY", "WOLF", "GORILLA", "FISH"];
   const STEP = 1 / 60;
@@ -37,12 +37,12 @@ const P2P = (() => {
   // timer de 8 ms em Worker (não é freado quando a aba fica em segundo plano)
   function ticker(fn) {
     try {
-      const url = URL.createObjectURL(new Blob(["setInterval(function(){postMessage(0)},8)"], { type: "text/javascript" }));
+      const url = URL.createObjectURL(new Blob(["setInterval(function(){postMessage(0)},4)"], { type: "text/javascript" }));
       const w = new Worker(url);
       w.onmessage = fn;
       return () => { try { w.terminate(); URL.revokeObjectURL(url); } catch {} };
     } catch {
-      const id = setInterval(fn, 8);
+      const id = setInterval(fn, 4);
       return () => clearInterval(id);
     }
   }
@@ -55,7 +55,7 @@ const P2P = (() => {
       this.room = null; this.clients = new Map(); this.nextId = 1;
       this.peer = null; this.stopTimer = null; this.hk = 0;
       this.dead = false; this.opening = false;
-      this.last = 0; this.acc = 0; this.tickN = 0;
+      this.last = 0; this.acc = 0; this.tickN = 0; this.snapN = 0;
       this.wake = null; this._vis = null;
     }
 
@@ -200,10 +200,10 @@ const P2P = (() => {
     }
 
     begin() {
-      this.last = Date.now(); this.acc = 0;
+      this.last = performance.now(); this.acc = 0;
       this.stopTimer = ticker(() => {
         if (this.dead || !this.room) return;
-        const now = Date.now();
+        const now = performance.now();
         this.acc += Math.min(0.25, (now - this.last) / 1000);
         this.last = now;
         while (this.acc >= STEP) {
@@ -229,7 +229,7 @@ const P2P = (() => {
     broadcast() {
       const game = this.room.game, snap = game.snapshot();
       game.events = [];
-      const base = JSON.stringify(snap).slice(0, -1) + ',"room":"' + this.room.code + '"';
+      const base = JSON.stringify(snap).slice(0, -1) + ',"room":"' + this.room.code + '","n":' + (++this.snapN);
       for (const c of this.room.clients) if (c.p) c.send(base + ',"ack":' + (c.p.ack | 0) + "}", true);
     }
 
