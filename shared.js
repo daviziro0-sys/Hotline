@@ -102,6 +102,10 @@
   const BLADE_PCT = { MACHETE: 70, AXE: 150 };         // % de vida tirada pela LÂMINA arremessada (machete 70%, machado 150%)
   const BLADE_CHANCE_OF = { AXE: 0.25 };               // chance de acertar a LÂMINA por arma (padrão BLADE_CHANCE); o machado é mais difícil de acertar com a lâmina
   const bladeChanceOf = type => BLADE_CHANCE_OF[type] !== undefined ? BLADE_CHANCE_OF[type] : BLADE_CHANCE;
+  // Shadow 4: a lâmina arremessada conta como "lâmina" a menos que o CABO venha quase de frente. cos(ângulo entre a arma e a direção do voo):
+  // 0 = metade das vezes (antigo) · -0.7 = só falha se o cabo estiver a menos de ~45° da frente (~75% de lâmina). Mais perto de -1 = mais lâmina.
+  const HERO_BLADE_COS = -0.7;
+  const HERO_THROW_SPIN = 7;    // rad/s do giro da lâmina do Shadow 4 (as outras armas giram a 22): gira devagar, então a ponta fica pra frente quase o voo todo
   const BLADE_DMG = { KNIFE: 35, KATANA: 50 };   // % de vida tirada pela lâmina de quem não tira 100%
   // Atordoamento (s) de quem leva uma arma arremessada: corpo a corpo não atordoa (só o taco), armas de fogo 1 s
   const THROW_DOWN = {
@@ -231,6 +235,17 @@
   function itemDistOn(L, type, ix, iy, rot, px, py) {
     if (L && L.onTable(ix, iy)) return Math.max(0, Math.hypot(px - ix, py - iy) - TABLE_REACH);
     return itemDist(type, ix, iy, rot, px, py);
+  }
+  // Hitbox da arma ARREMESSADA: o segmento inteiro cabo -> ponta (girado por rot), igual ao que aparece na tela, e não só o ponto de empunhadura.
+  // A lança em voo é desenhada puxada 78px pra trás, então a ponta fica só ~24px à frente do ponto do item.
+  const THROW_EXT = { SPEAR: [94, 24] };
+  const THROW_HIT_PAD = 10;  // folga (px) além do raio do jogador (PR) para a arma em voo acertar
+  function thrownNear(it, px, py) {   // ponto da arma em voo mais perto de (px,py): { d: distância, x, y }
+    const e = THROW_EXT[it.type] || ITEM_EXT[it.type] || [8, 30], c = Math.cos(it.rot), s = Math.sin(it.rot);
+    const ax = it.x - c * e[0], ay = it.y - s * e[0], dx = c * (e[0] + e[1]), dy = s * (e[0] + e[1]), l2 = dx * dx + dy * dy;
+    let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+    const qx = ax + dx * t, qy = ay + dy * t;
+    return { d: Math.hypot(px - qx, py - qy), x: qx, y: qy };
   }
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1446,7 +1461,7 @@
       if (!this.level.los(p.x, p.y, sx, sy)) { sx = p.x; sy = p.y; }
       const sp = (jav ? 900 + 600 * charge : 820) * (p.skin === 'GORILLA' ? 1.2 : throwFactor(type));   // alcance depende do peso da arma (Shadow 2 lança tudo com a mesma força/distância)
       const it = this.addItem(type, sx, sy, Math.cos(a) * sp, Math.sin(a) * sp, p.weapon.ammo);
-      it.thrown = true; it.owner = p.id; it.t = jav ? 0.45 + 0.45 * charge : 0.45; it.spin = jav ? 0 : 22; it.pow = charge;
+      it.thrown = true; it.owner = p.id; it.t = jav ? 0.45 + 0.45 * charge : 0.45; it.spin = jav ? 0 : (bladeKills(p.skin) && WEAPONS[type].blade) ? HERO_THROW_SPIN : 22; it.pow = charge;
       if (jav || bladeKills(p.skin)) it.rot = a;   // a lança voa reta, com a ponta para frente; a lâmina do Shadow 4 sai com a ponta pra frente (e vai girando)
       p.weapon = null; p.charging = false; p.chg = 0; p.cd = Math.max(p.cd, 0.25);
       this.events.push({ t: 'throw', by: p.id, x: p.x, y: p.y });
@@ -1612,12 +1627,13 @@
             it.x = nx; it.y = ny;
             for (const p of this.players) {
               if (!p || !p.alive || p.dive || p.id === it.owner) continue;
-              if (Math.hypot(p.x - it.x, p.y - it.y) < PR + 10) {
+              const nr = thrownNear(it, p.x, p.y);
+              if (nr.d < PR + THROW_HIT_PAD && this.level.los(it.x, it.y, nr.x, nr.y)) {   // a arma inteira conta (não atravessa parede)
                 const wd = WEAPONS[it.type], ang = Math.atan2(it.vy, it.vx);
                 let pct = THROW_DMG, how = 'throw', bl = 0, cb = 0, pw = 0, gl = 0;
                 const thrower = this.byId(it.owner);
-                if (wd.blade && thrower && bladeKills(thrower.skin)) {   // Shadow 4: vale a ponta que bate primeiro — a arma gira no ar; ponta (lâmina) na frente = 100% de dano; cabo na frente = pancada comum de 10%
-                  if (Math.cos(angDiff(it.rot, ang)) > 0) { pct = Math.max(100, BLADE_PCT[it.type] || 0); how = 'blade'; bl = 1; }   // 100% (machete/faca/katana) · machado mantém 150%
+                if (wd.blade && thrower && bladeKills(thrower.skin)) {   // Shadow 4: a arma gira devagar no ar; só o CABO vindo quase de frente (HERO_BLADE_COS) vira pancada comum de 10% — o resto é lâmina = 100% de dano
+                  if (Math.cos(angDiff(it.rot, ang)) > HERO_BLADE_COS) { pct = Math.max(100, BLADE_PCT[it.type] || 0); how = 'blade'; bl = 1; }   // 100% (machete/faca/katana) · machado mantém 150%
                   else cb = 1;
                 } else if (it.type === 'BROKEN' && thrower && bladeKills(thrower.skin)) {   // CORUJA: só a garrafa QUEBRADA arremessada tira 100% (a inteira é pancada comum)
                   pct = 100; how = 'blade'; bl = 1; gl = 1;
