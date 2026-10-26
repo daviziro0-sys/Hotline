@@ -12,7 +12,15 @@
    ========================================================================== */
 const P2P = (() => {
   const PFX = "sh7x-";                       // prefixo do ID da sala no broker
-  const OPTS = { debug: 0 };                 // SEM "config": mantém os servidores ICE padrão do PeerJS (como no OUTCOME)
+  // Opcional: seu próprio TURN. Vazio = servidores ICE padrão do PeerJS, exatamente como o index que funciona.
+  const MY_TURN = [
+    // { urls: ["turn:SEU_HOST:3478", "turns:SEU_HOST:443?transport=tcp"], username: "USUARIO", credential: "SENHA" },
+  ];
+  const OPTS = MY_TURN.length ? { debug: 0, config: { iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+    ...MY_TURN,
+  ] } } : { debug: 0 };
   const RELIABLE = true;                     // OUTCOME usa canal confiável; ponha false para voltar ao modo "sem retransmissão"
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const SKINS = ["HERO", "ROOSTER", "TIGER", "BEAR", "MONKEY", "WOLF", "GORILLA", "FISH"];
@@ -298,7 +306,7 @@ const P2P = (() => {
       this.to = setTimeout(() => retry("timeout"), 10000);
       peer.on("open", () => {
         if (this.done || this.peer !== peer) return;
-        const conn = this.conn = peer.connect(PFX + this.room, { reliable: RELIABLE, serialization: "none" });
+        const conn = this.conn = peer.connect(PFX + this.room, { reliable: RELIABLE });
         conn.on("open", () => {
           if (this.done || this.peer !== peer) return;
           clearTimeout(this.to);

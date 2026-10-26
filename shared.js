@@ -1059,7 +1059,7 @@
 
     // dispara se der (cooldown pronto + clique guardado ou botão segurado; todas as armas são automáticas). Chamado a cada tick E logo quando a entrada chega (menos atraso).
     tryFire(p) {
-      if (!p || !p.alive || p.down || p.dive || p.healT > 0 || p.charging || this.phase !== 'live') return;
+      if (!p || !p.alive || p.down || p.dive || p.healT > 0 || p.charging || this.phase !== 'live' || this.level.waterAt(p.x, p.y)) return;   // nadando: não usa arma
       const w = p.weapon ? WEAPONS[p.weapon.type] : WEAPONS.FISTS;
       if (p.cd <= 0 && (p.buf > 0 || p.fire)) { p.buf = 0; this.attack(p); }   // segurar o botão repete o ataque em TODAS as armas (inclusive corpo a corpo e mãos)
     }
@@ -1434,7 +1434,7 @@
     }
     // Arremessar: a lança precisa ser CARREGADA (segura o botão, solta para lançar); as outras armas saem na hora.
     startThrow(p) {
-      if (!p.weapon) return;
+      if (!p.weapon || this.level.waterAt(p.x, p.y)) return;   // nadando: não arremessa
       p.hookOn = false;
       if (WEAPONS[p.weapon.type].jav) { p.charging = true; p.chg = 0; p.fire = false; }
       else this.throwWeapon(p);
