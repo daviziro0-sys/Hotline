@@ -153,8 +153,8 @@
     SPEAR:   { name: 'LANÇA',   dmg: 60, melee: true, jav: true, range: 148, arc: 0.95, cd: 0.55, col: '#ffd9a0' },
     // GARRAFA DE VINHO: só nasce nas cozinhas da CASA (não entra no sorteio de raridade). Inteira bate fraco; ao bater numa parede
     // (golpe ou arremesso) ela QUEBRA e vira GARRAFA QUEBRADA: golpe rápido, curto e mais forte (uma faquinha).
-    WINE:    { name: 'GARRAFA', dmg: 12, melee: true, range: 74, arc: 1.9, cd: 0.38, col: '#8a1f3a', brk: 'BROKEN' },
-    BROKEN:  { name: 'GARRAFA QUEBRADA', dmg: 32, melee: true, range: 60, arc: 1.7, cd: 0.24, col: '#cfe9d8' },
+    WINE:    { name: 'GARRAFA', dmg: 12, melee: true, range: 94, arc: 1.9, cd: 0.38, col: '#8a1f3a', brk: 'BROKEN' },
+    BROKEN:  { name: 'GARRAFA QUEBRADA', dmg: 32, melee: true, range: 80, arc: 1.7, cd: 0.24, col: '#cfe9d8' },
     PISTOL:  { name: 'PISTOLA', dmg: 35, ammo: 9,  cd: 0.30,  spread: 0.03, speed: 1150, pellets: 1, range: 1100, auto: false, col: '#6bf4ff', muz: 32 },
     REVOLVER:{ name: 'REVÓLVER',dmg: 60, ammo: 6,  cd: 0.48,  spread: 0.02, speed: 1300, pellets: 1, range: 1100, auto: false, col: '#ffcf5a', muz: 34 },
     SMG:     { name: 'SMG',     dmg: 12, ammo: 30, cd: 0.085, spread: 0.11, speed: 1100, pellets: 1, range: 900,  auto: true,  col: '#ff8ad8', muz: 44 },
@@ -232,6 +232,7 @@
   }
   // Item em cima de uma MESA: é um ponto (a garrafa está em pé) e dá pra alcançar por cima da mesa (desconta TABLE_REACH da distância)
   const TABLE_REACH = 56;
+  const BOTTLE_MEND_T = 4;   // s: garrafa QUEBRADA parada no chão volta a ser garrafa inteira
   function itemDistOn(L, type, ix, iy, rot, px, py) {
     if (L && L.onTable(ix, iy)) return Math.max(0, Math.hypot(px - ix, py - iy) - TABLE_REACH);
     return itemDist(type, ix, iy, rot, px, py);
@@ -1433,7 +1434,7 @@
       for (const it of this.items) {
         if (it.thrown || !canHold(p.skin, it.type)) continue;   // Shadow 4 só pega corpo a corpo
         // V (bottle=true): só garrafas (inclusive em cima da mesa). E: tudo, e garrafa só depois de sair da mesa (no chão)
-        if (bottle ? !isBottle(it.type) : (isBottle(it.type) && this.level.onTable(it.x, it.y))) continue;
+        if (bottle ? !isBottle(it.type) : (isBottle(it.type) && (it.vo || this.level.onTable(it.x, it.y)))) continue;
         const d = itemDistOn(this.level, it.type, it.x, it.y, it.rot, p.x, p.y);
         if (d < bd && (this.level.onTable(it.x, it.y) || this.level.los(p.x, p.y, it.x, it.y))) { bd = d; best = it; }   // item na mesa: o próprio móvel não conta como parede   // não pega arma do outro lado da parede
       }
@@ -1618,6 +1619,7 @@
               if (dh) { const m = 0.6 + wgt * 0.3; this.shotDoor(dh, { x: nx, y: ny, vx: it.vx * m, vy: it.vy * m, owner: it.owner }); this.events.push({ t: 'door', i: dh.i, dir: 0, x: nx, y: ny, hit: false }); }
             }
             if (this.level.solidAt(nx, ny) || this.level.doorAt(nx, ny, 3)) {
+              if (isBottle(it.type) && this.level.rnd.size && this.level.rnd.has(Math.floor(ny / TILE) * this.level.W + Math.floor(nx / TILE))) it.vo = 1;   // bateu num objeto redondo: só se equipa com V
               if (WEAPONS[it.type].brk && this.level.solidAt(nx, ny)) {   // garrafa arremessada na parede: estilhaça e fica a garrafa quebrada no chão
                 it.type = WEAPONS[it.type].brk; it.ammo = 0;
                 this.events.push({ t: 'shatter', x: it.x, y: it.y, a: Math.atan2(it.vy, it.vx), by: it.owner });
@@ -1668,6 +1670,10 @@
           if (Math.abs(it.vx) + Math.abs(it.vy) < 4) { it.vx = 0; it.vy = 0; }
           it.rot += (it.vx + it.vy) * 0.002;
         }
+        if (!it.thrown && it.type === 'BROKEN') {   // garrafa quebrada parada no chão um tempo: volta a ser garrafa inteira
+          if (it.vx || it.vy) it.rest = 0;
+          else { it.rest = (it.rest || 0) + dt; if (it.rest >= BOTTLE_MEND_T) { it.type = 'WINE'; it.ammo = 0; it.rest = 0; this.events.push({ t: 'mend', x: it.x, y: it.y }); } }
+        }
       }
     }
 
@@ -1686,7 +1692,7 @@
           cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (this.byId(p.hook.id) ? this.byId(p.hook.id).slot + 1 : 0) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
         })),
         b: this.bullets.map(b => [b.id, r1(b.x), r1(b.y), Math.round(b.vx), Math.round(b.vy), (b.owner in slotOf ? slotOf[b.owner] : -1), b.r || 0]),   // [5] = slot de quem atirou (o cliente usa para não duplicar o tiro previsto)
-        it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0]),
+        it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0, i.vo ? 1 : 0]),
         pw: this.level ? this.level.pw.reduce((m, v, i) => m | (v ? 0 : (1 << i)), 0) : 0,   // pw = bitmask dos quadros de energia BALEADOS
         lo: this.level ? this.level.lt.reduce((m, v, i) => m | (v ? 0 : (1 << i)), 0) : 0,   // lo = bitmask dos cômodos com a luz APAGADA
         dr: this.level ? this.level.doors.filter(d => !d.latched).map(d => [d.i, Math.round(d.phi * 1000) / 1000, Math.round(d.w * 100) / 100]) : [],
