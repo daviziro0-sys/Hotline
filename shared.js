@@ -8,6 +8,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  const hyp = (a, b) => Math.sqrt(a * a + b * b);   // Math.hypot é bem mais lento no V8 e aqui nunca há overflow
   const TILE = 72, PR = 18, CS = 1.35, SPEED = 290, WIN_SCORE = 5, DOWN_TIME = 1.7;
   const MAX_PLAYERS = 7;   // máximo de jogadores na sala
   const SUI_TURN = 0.7;    // segundos segurando CTRL até a arma apontar para a cabeça
@@ -42,7 +43,6 @@
   const HOOK_RANGE = 560;    // alcance do gancho (px)
   const HOOK_HIT_W = PR * 4.5;   // largura da colisão da corda (distância lateral máxima do alvo à linha da mira): quanto maior, mais fácil de acertar
   const HOOK_MIN = 80;       // mais perto que isso já está na distância do golpe: não precisa de gancho
-  const HOOK_CONE = 0.5;     // tolerância de mira (rad, ~29°) — pega quem estiver mais perto da direção que você aponta
   const HOOK_SPEED = 1700;   // velocidade da puxada (px/s)
   const HOOK_MAX_T = 0.7;    // tempo máximo da puxada (s)
   const HOOK_STOP = PR * 2 + 8;   // distância em que para (colado no alvo, ao alcance das mãos)
@@ -232,9 +232,8 @@
   }
   // Item em cima de uma MESA: é um ponto (a garrafa está em pé) e dá pra alcançar por cima da mesa (desconta TABLE_REACH da distância)
   const TABLE_REACH = 56;
-  const BOTTLE_MEND_T = 4;   // s: garrafa QUEBRADA parada no chão volta a ser garrafa inteira
   function itemDistOn(L, type, ix, iy, rot, px, py) {
-    if (L && L.onTable(ix, iy)) return Math.max(0, Math.hypot(px - ix, py - iy) - TABLE_REACH);
+    if (L && L.onTable(ix, iy)) return Math.max(0, hyp(px - ix, py - iy) - TABLE_REACH);
     return itemDist(type, ix, iy, rot, px, py);
   }
   // Hitbox da arma ARREMESSADA: o segmento inteiro cabo -> ponta (girado por rot), igual ao que aparece na tela, e não só o ponto de empunhadura.
@@ -246,7 +245,7 @@
     const ax = it.x - c * e[0], ay = it.y - s * e[0], dx = c * (e[0] + e[1]), dy = s * (e[0] + e[1]), l2 = dx * dx + dy * dy;
     let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
     const qx = ax + dx * t, qy = ay + dy * t;
-    return { d: Math.hypot(px - qx, py - qy), x: qx, y: qy };
+    return { d: hyp(px - qx, py - qy), x: qx, y: qy };
   }
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -673,7 +672,7 @@
   function segDist(cx, cy, ax, ay, bx, by) {
     const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
     let t = l2 ? ((cx - ax) * dx + (cy - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
-    return Math.hypot(ax + dx * t - cx, ay + dy * t - cy);
+    return hyp(ax + dx * t - cx, ay + dy * t - cy);
   }
 
   /* ---------------------------------------------------------------- NÍVEL */
@@ -710,7 +709,7 @@
     // interruptor mais perto de (px,py) dentro do alcance, ou null
     switchNear(px, py) {
       let best = null, bd = SW_REACH;
-      for (const s of (this.m.switches || [])) { const [sx, sy] = this.switchPos(s), d = Math.hypot(px - sx, py - sy); if (d < bd) { bd = d; best = s; } }
+      for (const s of (this.m.switches || [])) { const [sx, sy] = this.switchPos(s), d = hyp(px - sx, py - sy); if (d < bd) { bd = d; best = s; } }
       return best;
     }
     fountainIdx(f) { return this.m.furn.filter(q => q.k === 'fountain').indexOf(f); }
@@ -719,7 +718,7 @@
       let best = null, bd = Infinity;
       for (const f of (this.m.furn || [])) {
         if (f.k !== 'fountain') continue;
-        const cx = (f.x + f.w / 2) * TILE, cy = (f.y + f.h / 2) * TILE, d = Math.hypot(px - cx, py - cy);
+        const cx = (f.x + f.w / 2) * TILE, cy = (f.y + f.h / 2) * TILE, d = hyp(px - cx, py - cy);
         if (d <= Math.min(f.w, f.h) * TILE / 2 + COIN_REACH && d < bd) { bd = d; best = f; }
       }
       return best;
@@ -733,7 +732,7 @@
     solidAt(px, py) {
       const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
       if (this.solid(tx, ty)) return true;
-      if (this.rnd.size && this.rnd.has(ty * this.W + tx)) for (const c of this.circ) if (Math.hypot(px - c.x, py - c.y) < c.r) return true;
+      if (this.rnd.size && this.rnd.has(ty * this.W + tx)) for (const c of this.circ) if (hyp(px - c.x, py - c.y) < c.r) return true;
       return false;
     }
     // item parado em cima de um móvel sólido (mesa): é o caso das garrafas de vinho do mapa
@@ -742,7 +741,7 @@
     // ---- portas com física: a folha gira em torno da dobradiça (phi = ângulo, w = velocidade angular).
     // Fechada = "travada" (tile sólido). Destravada = folha solta que balança, empurra e pode ser fechada de novo.
     doorEnd(d) { const a = d.o === 'h' ? d.phi : Math.PI / 2 - d.phi; return [d.hx + Math.cos(a) * TILE, d.hy + Math.sin(a) * TILE]; }
-    doorDist(d, x, y) { const e = this.doorEnd(d); return segDist(x, y, d.hx, d.hy, e[0], e[1]); }
+    doorDist(d, x, y) { const a = d.o === 'h' ? d.phi : Math.PI / 2 - d.phi; return segDist(x, y, d.hx, d.hy, d.hx + Math.cos(a) * TILE, d.hy + Math.sin(a) * TILE); }
     doorAt(x, y, r) { for (const d of this.doors) if (!d.latched && this.doorDist(d, x, y) < DOOR_HT + r) return true; return false; }
     doorHit(x, y, r) { for (const d of this.doors) if (!d.latched && this.doorDist(d, x, y) < DOOR_HT + r) return d; return null; }
     setLatched(d, v) { d.latched = v; this.g[d.y][d.x] = v ? 2 : 0; if (v) { d.phi = 0; d.w = 0; } }
@@ -774,11 +773,11 @@
     pushCircles(p, r) {
       for (const c of this.circ) {
         const dx = p.x - c.x, dy = p.y - c.y, rr = c.r + r;
-        if (dx * dx + dy * dy < rr * rr) { const d = Math.hypot(dx, dy) || 1e-3; p.x = c.x + dx / d * rr; p.y = c.y + dy / d * rr; }
+        if (dx * dx + dy * dy < rr * rr) { const d = hyp(dx, dy) || 1e-3; p.x = c.x + dx / d * rr; p.y = c.y + dy / d * rr; }
       }
     }
     los(x1, y1, x2, y2) {
-      const d = Math.hypot(x2 - x1, y2 - y1), n = Math.ceil(d / 8);
+      const d = hyp(x2 - x1, y2 - y1), n = Math.ceil(d / 8);
       for (let i = 1; i < n; i++) { const t = i / n; if (this.solidAt(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false; }
       return true;
     }
@@ -795,14 +794,14 @@
     }
   }
 
-  function canMove(phase, alive, down, healing) { return !!alive && !down && (phase === 'live' || phase === 'over' || phase === 'matchover'); }
+  function canMove(phase, alive, down) { return !!alive && !down && (phase === 'live' || phase === 'over' || phase === 'matchover'); }
 
   // k = bitmask: W=1 A=2 S=4 D=8
   function stepMove(level, p, k, dt, sm = 1) {   // sm = multiplicador de velocidade (curando = HEAL_SLOW)
     let dx = ((k & 8) ? 1 : 0) - ((k & 2) ? 1 : 0), dy = ((k & 4) ? 1 : 0) - ((k & 1) ? 1 : 0);
     if (!dx && !dy) return null;
-    const l = Math.hypot(dx, dy); dx /= l; dy /= l;
-    { const wt = p.weapon ? p.weapon.type : p.wt; if (p.skin !== 'GORILLA' && WEAPON_SLOW[wt]) sm *= WEAPON_SLOW[wt]; }   // Shadow 2 não fica lento com arma pesada   // armas pesadas na mão deixam lento (no cliente a previsão guarda o tipo em p.wt)
+    const l = hyp(dx, dy); dx /= l; dy /= l;
+    { const wt = p.weapon ? p.weapon.type : p.wt; if (p.skin !== 'GORILLA' && WEAPON_SLOW[wt]) sm *= WEAPON_SLOW[wt]; }   // arma pesada deixa lento (Shadow 2 é imune); no cliente a previsão guarda o tipo em p.wt
     if (p.slowT > 0) sm *= ACT_SLOW;     // lentidão da explosão do Shadow 2
     if (p.dualOn) sm *= PANTHER_SPEED;   // modo pantera (dupla) é mais lento
     if (p.fxSpd) sm *= p.fxSpd;          // buff/debuff da fonte
@@ -899,7 +898,7 @@
       const L = this.level, sp = L.m.spawn, cand = [];
       for (let y = 0; y < L.H; y++) for (let x = 0; x < L.W; x++) {
         if (L.g[y][x] !== 0) continue;
-        if (sp.some(s => Math.hypot(s[0] - x, s[1] - y) < 1.8)) continue;   // não nasce em cima de quem acabou de nascer
+        if (sp.some(s => hyp(s[0] - x, s[1] - y) < 1.8)) continue;   // não nasce em cima de quem acabou de nascer
         cand.push([x, y]);
       }
       const want = Math.max(1, Math.round((4 + Math.floor(Math.random() * 6)) * (L.W * L.H > 700 ? 1.8 : 1) * this.weaponMul)), placed = [];   // mapa grande = mais armas
@@ -908,7 +907,7 @@
         // mesma regra de justiça sem espelho: cada arma sorteada nasce DUAS vezes, uma na metade esquerda e outra na direita (metade das duplas dentro das construções)
         const half = L.W / 2, put = [];
         const spot = (arr, right) => {
-          const f = arr.filter(c => (c[0] >= half) === right && !put.some(q => Math.hypot(q[0] - c[0], q[1] - c[1]) < 2.2));
+          const f = arr.filter(c => (c[0] >= half) === right && !put.some(q => hyp(q[0] - c[0], q[1] - c[1]) < 2.2));
           return f.length ? pick(f) : null;
         };
         for (let n = 0; n < want; n++) {
@@ -924,8 +923,8 @@
       }
       for (let tries = 0; tries < 600 && !L.m.free && placed.length < want && cand.length; tries++) {
         const [x, y] = pick(indoor.length && placed.length % 2 === 0 ? indoor : cand), mx = L.W - 1 - x, my = L.H - 1 - y;
-        if (placed.some(q => Math.hypot(q[0] - x, q[1] - y) < 2.2 || Math.hypot(q[0] - mx, q[1] - my) < 2.2)) continue;
-        if (Math.hypot(x - mx, y - my) < 1.5) continue;
+        if (placed.some(q => hyp(q[0] - x, q[1] - y) < 2.2 || hyp(q[0] - mx, q[1] - my) < 2.2)) continue;
+        if (hyp(x - mx, y - my) < 1.5) continue;
         placed.push([x, y]);
       }
       for (const [x, y] of placed) {
@@ -967,7 +966,7 @@
         if (inp.sl) this.useActive(p);                      // ATIVA (Espaço)
         }
       }
-      if (canMove(this.phase, p.alive, p.down, p.healT > 0) && !p.hook) {   // puxado pelo gancho: o servidor move o boneco
+      if (canMove(this.phase, p.alive, p.down) && !p.hook) {   // puxado pelo gancho: o servidor move o boneco
         const dd = Math.min(dt, 0.05, p.budget);
         if (dd > 0) {
           p.budget -= dd;
@@ -1003,7 +1002,7 @@
         if (p.alive && !p.inv[p.sel] && p.inv[1 - p.sel]) p.sel = 1 - p.sel;   // largou/arremessou/perdeu a arma da mão: saca a outra sozinho
         if (p.hook && (!p.alive || p.down || this.phase !== 'live')) p.hook = null;   // morreu/caiu/acabou a rodada: solta o gancho
         if (p.down) { p.downT -= dt; if (p.downT <= 0) p.down = false; }
-        if (p.emT > 0) { p.emT -= dt; if (!canMove(this.phase, p.alive, p.down, p.healT > 0) || p.hook || p.charging) p.emT = 0; }   // dançando só vivo, em pé e livre
+        if (p.emT > 0) { p.emT -= dt; if (!canMove(this.phase, p.alive, p.down) || p.hook || p.charging) p.emT = 0; }   // dançando só vivo, em pé e livre
         if (p.healT > 0) {
           if (!p.alive || p.down || this.phase !== 'live') p.healT = 0;
           else {
@@ -1076,7 +1075,6 @@
     // dispara se der (cooldown pronto + clique guardado ou botão segurado; todas as armas são automáticas). Chamado a cada tick E logo quando a entrada chega (menos atraso).
     tryFire(p) {
       if (!p || !p.alive || p.down || p.dive || p.healT > 0 || p.charging || this.phase !== 'live' || this.level.waterAt(p.x, p.y)) return;   // nadando: não usa arma
-      const w = p.weapon ? WEAPONS[p.weapon.type] : WEAPONS.FISTS;
       if (p.cd <= 0 && (p.buf > 0 || p.fire)) { p.buf = 0; this.attack(p); }   // segurar o botão repete o ataque em TODAS as armas (inclusive corpo a corpo e mãos)
     }
     attack(p) {
@@ -1126,7 +1124,7 @@
         let hitAny = false;
         for (const o of this.players) {
           if (!o || o === p || !o.alive || o.dive) continue;
-          const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+          const dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy);
           let tot = 0, knock = false, aa = Math.atan2(dy, dx);
           for (const h of hands) {   // cada arma acerta (ou não) com o próprio alcance/arco; quem acerta soma o próprio dano
             if (d > h.r + PR) continue;
@@ -1228,7 +1226,7 @@
     emote(p) {
       p.emCd = 0.4;
       if (p.emT > 0) { p.emT = 0; return; }
-      if (!canMove(this.phase, p.alive, p.down, false) || p.hook || p.healT > 0 || p.charging) return;
+      if (!canMove(this.phase, p.alive, p.down) || p.hook || p.healT > 0 || p.charging) return;
       p.emT = EMOTE_TIME; p.fire = false; p.buf = 0;
     }
     // ATIVA: sacrifica 15% da vida ATUAL na hora e solta uma explosão em área. Dano = HP sacrificado x ACT_MULT
@@ -1257,7 +1255,7 @@
       this.events.push({ t: 'blast', id: p.id, x: p.x, y: p.y, r: ACT_RADIUS, hp: Math.round(p.hp), d: Math.round(cost * ACT_MULT) });
       for (const o of this.players) {
         if (!o || o === p || !o.alive) continue;
-        const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+        const dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy);
         if (d > ACT_RADIUS + PR || !this.level.los(p.x, p.y, o.x, o.y)) continue;
         const f = 0.6 + 0.4 * (1 - Math.min(1, d / ACT_RADIUS));
         this.hurt(o, p, pct * f, 'blast', Math.atan2(dy, dx));
@@ -1321,7 +1319,7 @@
       if (h.id && (!o || !o.alive)) { p.hook = null; return; }
       h.t -= dt;
       const tx = o ? o.x : h.ax, ty = o ? o.y : h.ay, stop = o ? HOOK_STOP : HOOK_WALL_STOP;
-      const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+      const dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy);
       if (d <= stop) {   // chegou: o alvo fica atordoado mais um pouco para dar tempo do golpe
         if (o && o.down && o.downT < HOOK_STUN) o.downT = HOOK_STUN;
         p.hook = null; return;
@@ -1329,7 +1327,7 @@
       if (h.t <= 0 || (o && !this.level.los(p.x, p.y, o.x, o.y))) { p.hook = null; return; }   // acabou o tempo ou a corda enroscou na parede
       const step = Math.min(HOOK_SPEED * dt, d - stop), ux = dx / d, uy = dy / d, n = Math.max(1, Math.ceil(step / 6)), bx = p.x, by = p.y;
       for (let i = 0; i < n; i++) { p.x += ux * step / n; p.y += uy * step / n; this.level.push(p, PR); }
-      if (Math.hypot(p.x - bx, p.y - by) < step * 0.25) p.hook = null;   // bateu em algo e não saiu do lugar
+      if (hyp(p.x - bx, p.y - by) < step * 0.25) p.hook = null;   // bateu em algo e não saiu do lugar
       else this.doorContact(p, dt);
     }
     dropWeapon(p, vx = 0, vy = 0) {
@@ -1473,8 +1471,8 @@
         if (!d.latched) continue;
         const rx = d.x * TILE, ry = d.y * TILE;
         const cx = Math.max(rx, Math.min(p.x, rx + TILE)), cy = Math.max(ry, Math.min(p.y, ry + TILE));
-        if (Math.hypot(p.x - cx, p.y - cy) > PR + 2.5) continue;
-        const vx = rx + TILE / 2 - p.x, vy = ry + TILE / 2 - p.y, l = Math.hypot(vx, vy) || 1;
+        if (hyp(p.x - cx, p.y - cy) > PR + 2.5) continue;
+        const vx = rx + TILE / 2 - p.x, vy = ry + TILE / 2 - p.y, l = hyp(vx, vy) || 1;
         if ((dx * vx + dy * vy) / l < 0.35) continue;
         this.openDoor(d, p);
       }
@@ -1491,7 +1489,7 @@
       for (const q of this.players) {
         if (!q || !q.alive) continue;
         const cx = clamp(q.x, rx, rx + TILE), cy = clamp(q.y, ry, ry + TILE);
-        if (Math.hypot(q.x - cx, q.y - cy) < PR + 1) return true;
+        if (hyp(q.x - cx, q.y - cy) < PR + 1) return true;
       }
       return false;
     }
@@ -1527,7 +1525,7 @@
         for (let pass = 0; pass < 3; pass++) {
           const e = L.doorEnd(d), dx = e[0] - d.hx, dy = e[1] - d.hy;
           const t = clamp(((p.x - d.hx) * dx + (p.y - d.hy) * dy) / (TILE * TILE), 0, 1);
-          const cx = d.hx + dx * t, cy = d.hy + dy * t, vx = p.x - cx, vy = p.y - cy, dist = Math.hypot(vx, vy);
+          const cx = d.hx + dx * t, cy = d.hy + dy * t, vx = p.x - cx, vy = p.y - cy, dist = hyp(vx, vy);
           const pen = PR + DOOR_HT - dist;
           if (pen <= 0.05) break;
           touched = true;
@@ -1561,7 +1559,7 @@
     updateBullets(dt) {
       const out = [];
       for (const b of this.bullets) {
-        const sp = Math.hypot(b.vx, b.vy), n = Math.max(1, Math.ceil(sp * dt / 6));
+        const sp = hyp(b.vx, b.vy), n = Math.max(1, Math.ceil(sp * dt / 6));
         let dead = false;
         for (let s = 0; s < n && !dead; s++) {
           const px = b.x, py = b.y;
@@ -1584,13 +1582,16 @@
               this.events.push({ t: 'pwr', x: qx, y: qy });
             }
             dead = true; this.events.push({ t: 'wall', x: px, y: py, a: Math.atan2(b.vy, b.vx) }); break; }
-          { const dh = this.level.doorHit(b.x, b.y, 1.5); if (dh) this.shotDoor(dh, b); }
-          if (this.level.doorAt(b.x, b.y, 1.5)) { dead = true; this.events.push({ t: 'wall', x: px, y: py, a: Math.atan2(b.vy, b.vx) }); break; }   // porta destravada também barra tiro
+          const dh = this.level.doorHit(b.x, b.y, 1.5);   // sem porta atingida, doorAt (mesmo raio) seria sempre falso: pula a 2ª varredura
+          if (dh) {
+            this.shotDoor(dh, b);
+            if (this.level.doorAt(b.x, b.y, 1.5)) { dead = true; this.events.push({ t: 'wall', x: px, y: py, a: Math.atan2(b.vy, b.vx) }); break; }   // porta destravada também barra tiro
+          }
           for (const p of this.players) {
             if (!p || !p.alive || p.dive || p.id === b.owner) continue;
             if (segDist(p.x, p.y, px, py, b.x, b.y) < (b.r || PR)) {
               if (b.w === 'ORB') { b.hit = b.hit || new Set(); if (b.hit.has(p.id)) continue; b.hit.add(p.id); this.hurt(p, this.byId(b.owner), ORB_DMG, 'bullet', Math.atan2(b.vy, b.vx), 'ORB'); continue; }   // soco do gorila: atravessa e pega TODOS na área, 1x cada
-              dead = true; this.hurt(p, this.byId(b.owner), b.w === 'ORB' ? ORB_DMG : WEAPONS[b.w].dmg, 'bullet', Math.atan2(b.vy, b.vx), b.w); break; }
+              dead = true; this.hurt(p, this.byId(b.owner), WEAPONS[b.w].dmg, 'bullet', Math.atan2(b.vy, b.vx), b.w); break; }
           }
         }
         b.life -= dt;
@@ -1602,7 +1603,7 @@
     updateItems(dt) {
       for (const it of this.items) {
         if (it.thrown) {
-          const sp = Math.hypot(it.vx, it.vy), n = Math.max(1, Math.ceil(sp * dt / 8));
+          const sp = hyp(it.vx, it.vy), n = Math.max(1, Math.ceil(sp * dt / 8));
           const sx = it.vx * dt / n, sy = it.vy * dt / n; let stop = false;
           for (let s = 0; s < n && !stop; s++) {
             const nx = it.x + sx, ny = it.y + sy;
@@ -1657,7 +1658,7 @@
           it.rot += it.spin * dt; it.t -= dt;
           if (stop || it.t <= 0) { it.thrown = false; it.owner = null; it.vx *= 0.25; it.vy *= 0.25; it.spin = 0; }
         } else if (it.vx || it.vy) {
-          const nx = it.x + it.vx * dt, ny = it.y + it.vy * dt, spd = Math.hypot(it.vx, it.vy);
+          const nx = it.x + it.vx * dt, ny = it.y + it.vy * dt, spd = hyp(it.vx, it.vy);
           let hitW = false;
           if (!this.level.solidAt(nx, it.y)) it.x = nx; else { it.vx = 0; hitW = true; }
           if (!this.level.solidAt(it.x, ny)) it.y = ny; else { it.vy = 0; hitW = true; }
@@ -1669,10 +1670,6 @@
           const f = Math.pow(0.02, dt); it.vx *= f; it.vy *= f;
           if (Math.abs(it.vx) + Math.abs(it.vy) < 4) { it.vx = 0; it.vy = 0; }
           it.rot += (it.vx + it.vy) * 0.002;
-        }
-        if (!it.thrown && it.type === 'BROKEN') {   // garrafa quebrada parada no chão um tempo: volta a ser garrafa inteira
-          if (it.vx || it.vy) it.rest = 0;
-          else { it.rest = (it.rest || 0) + dt; if (it.rest >= BOTTLE_MEND_T) { it.type = 'WINE'; it.ammo = 0; it.rest = 0; this.events.push({ t: 'mend', x: it.x, y: it.y }); } }
         }
       }
     }
@@ -1689,7 +1686,7 @@
           id: p.id, dv: p.dive ? 1 : 0, ai: +(p.air / DIVE_AIR).toFixed(2), sl: p.slot, nm: p.name, sk: p.skin, cl: p.color, sc: p.score, kl: p.kills | 0, x: r1(p.x), y: r1(p.y), a: Math.round(p.angle * 100) / 100,
           hp: Math.round(p.hp), hz: +Math.max(0, p.healT).toFixed(2), al: p.alive ? 1 : 0, dn: p.down ? 1 : 0, dt: +Math.max(0, p.downT).toFixed(2),
           w: p.weapon ? p.weapon.type : 0, am: p.weapon ? p.weapon.ammo : 0, se: p.sel, iv: p.inv.map(x => x ? [x.type, x.ammo] : 0), bot: p.bot ? 1 : 0, ch: p.charging ? +(p.chg / spearChargeOf(p.skin)).toFixed(2) : -1,
-          cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (this.byId(p.hook.id) ? this.byId(p.hook.id).slot + 1 : 0) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
+          cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (hq => hq ? hq.slot + 1 : 0)(this.byId(p.hook.id)) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
         })),
         b: this.bullets.map(b => [b.id, r1(b.x), r1(b.y), Math.round(b.vx), Math.round(b.vy), (b.owner in slotOf ? slotOf[b.owner] : -1), b.r || 0]),   // [5] = slot de quem atirou (o cliente usa para não duplicar o tiro previsto)
         it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0, i.vo ? 1 : 0]),
@@ -1734,7 +1731,8 @@
       this.g = game; this.slot = slot;
       const D = { EASY: { turn: 3.2, react: 0.55, acc: 0.14 }, NORMAL: { turn: 5.5, react: 0.32, acc: 0.07 }, HARD: { turn: 9, react: 0.16, acc: 0.03 } };
       this.d = D[diff] || D.NORMAL;
-      this.ang = slot ? Math.PI : 0; this.path = []; this.pathT = Math.random() * 0.25;   // escalonado: os bots não recalculam o caminho no mesmo frame this.seen = 0; this.noise = 0; this.noiseT = 0;
+      this.ang = slot ? Math.PI : 0; this.path = []; this.pathT = Math.random() * 0.25;   // escalonado: os bots não recalculam o caminho no mesmo frame
+      this.seen = 0; this.noise = 0; this.noiseT = 0;
       this.st = 1; this.stT = 0; this.pkCd = 0; this.thCd = 0; this.hlCd = 0; this.swCd = 0;
     }
     think(dt) {
@@ -1744,14 +1742,14 @@
       let en = null, bestD = Infinity;
       for (const q of g.players) {
         if (!q || q === me) continue;
-        const dd = Math.hypot(q.x - me.x, q.y - me.y) + (q.alive ? 0 : 1e6);
+        const dd = hyp(q.x - me.x, q.y - me.y) + (q.alive ? 0 : 1e6);
         if (dd < bestD) { bestD = dd; en = q; }
       }
       if (!en) return;
       const idle = { k: 0, a: this.ang, f: 0, fp: 0, pk: 0, it: 0, th: 0 };
       if (g.phase !== 'live' || !me.alive || me.down || !g.level) { g.applyInput(me, idle, dt); return; }
       const L = g.level, D = this.d, T = TILE;
-      const dx = en.x - me.x, dy = en.y - me.y, dist = Math.hypot(dx, dy) || 1;
+      const dx = en.x - me.x, dy = en.y - me.y, dist = hyp(dx, dy) || 1;
       const los = en.alive && L.los(me.x, me.y, en.x, en.y);
       this.seen = los ? this.seen + dt : 0;
       this.noiseT -= dt; if (this.noiseT <= 0) { this.noiseT = 0.4; this.noise = (Math.random() - 0.5) * D.acc * 2; }
@@ -1771,14 +1769,14 @@
         for (const it of g.items) {
           const iw = WEAPONS[it.type];
           if (it.thrown || (!iw.melee && it.ammo <= 0) || !canHold(me.skin, it.type) || g.level.onTable(it.x, it.y)) continue;   // item em cima de mesa o bot ignora (não dá pra chegar andando)
-          const d = Math.hypot(it.x - me.x, it.y - me.y), gunB = iw.melee ? 0 : 140, sc = d - gunB;
+          const d = hyp(it.x - me.x, it.y - me.y), gunB = iw.melee ? 0 : 140, sc = d - gunB;
           if ((!armed || (gunB > 0 && d < 220)) && sc < bd) { bd = sc; item = it; }
         }
       }
       let goal, pk = 0, itx = 0, fire = 0, fp = 0, th = 0, strafe = 0, back = 0, approach = true, pref = 280;
       if (item) {
         goal = { x: item.x, y: item.y };
-        if (Math.hypot(item.x - me.x, item.y - me.y) < 34 && this.pkCd <= 0) { if (isBottle(item.type)) itx = 1; else pk = 1; this.pkCd = 0.5; }
+        if (hyp(item.x - me.x, item.y - me.y) < 34 && this.pkCd <= 0) { if (isBottle(item.type)) itx = 1; else pk = 1; this.pkCd = 0.5; }
       } else goal = { x: en.x, y: en.y };
 
       // 2) mira
@@ -1817,7 +1815,7 @@
           while (this.path.length && this.path[0][0] === mtx && this.path[0][1] === mty) this.path.shift();
           if (this.path.length) { tx = (this.path[0][0] + 0.5) * T; ty = (this.path[0][1] + 0.5) * T; }
         }
-        const vx = tx - me.x, vy = ty - me.y, l = Math.hypot(vx, vy);
+        const vx = tx - me.x, vy = ty - me.y, l = hyp(vx, vy);
         if (l > 6) { mx = vx / l; my = vy / l; }
       }
       if (!(en.alive && los) && (mx || my)) wantAng = Math.atan2(my, mx);
