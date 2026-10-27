@@ -163,3 +163,6 @@ body.touch #menu h1 .t1{padding:4px 10px;margin:-4px -10px;touch-action:manipula
 /* relógio da rodada no celular: respeita o entalhe da tela */
 body.touch #roundTimer{top:calc(8px + var(--st));font-size:1rem;padding:3px 12px}
 body.touch #suiBar{display:none}
+
+/* slots do inventário sempre tocáveis por cima da zona de toque (analógico flutuante) */
+body.touch.tcPlay #invBar{z-index:10}

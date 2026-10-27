@@ -184,7 +184,7 @@
     A.firing = false; A.manual = false; TA.on = false; TA.man = false;
     if (!mode || paused || canSpec()) return;
     if (was && ang != null) taFire(ang);                       // arrastou e soltou = ataca na direção da mira
-    else { const a = taAuto(); taFire(a !== null ? a : (ang != null ? ang : TA.face)); }   // toque rápido = mira automática no inimigo mais próximo
+    else { const a = taAuto(), fa = a !== null ? a : (ang != null ? ang : TA.face); tAim = fa; taFire(fa); }   // toque rápido = mira automática no inimigo mais próximo
   }
   function moveA(e) {
     const R = rad('aim');
@@ -192,8 +192,9 @@
     A.moved = Math.max(A.moved, Math.hypot(e.clientX - A.sx, e.clientY - A.sy));
     if (!fixedMode && d > R * 1.5) { const k = (d - R * 1.5) / d; A.ox += dx * k; A.oy += dy * k; place(baseR, A.ox, A.oy); dx = e.clientX - A.ox; dy = e.clientY - A.oy; d = Math.hypot(dx, dy); }
     const c = d > R ? R / d : 1; knob(knobR, dx * c, dy * c);
-    if (d > 8) tAim = Math.atan2(dy, dx);
-    A.manual = d / R >= DEAD;                                  // passou da zona morta = está mirando
+    const dragged = !fixedMode || A.moved >= 10;               // analógico fixo: encostar na borda não conta, só arrastar
+    if (d > 8 && dragged) { tAim = Math.atan2(dy, dx); TA.face = tAim; }
+    A.manual = dragged && d / R >= DEAD;                       // passou da zona morta = está mirando
     TA.on = true; TA.man = A.manual; if (A.manual) TA.ang = tAim;   // o game.js desenha a mira e usa este ângulo
     baseR.classList.toggle('fire', A.manual);
   }
@@ -333,7 +334,7 @@
   /* ----------------------------------- aplica a mira + mostra/esconde */
   let wasOn = false;
   function releaseAll() {
-    endMove(); if (A.id != null) { A.id = null; baseR.classList.remove('on'); ghostR.style.opacity = ''; }
+    endMove(); if (A.id != null) { A.id = null; baseR.classList.remove('on'); baseR.classList.remove('fire'); ghostR.style.opacity = ''; }
     A.firing = false; A.manual = false; TA.on = false; TA.man = false; mouse.down = false; keys.f = false;
     for (const k in holds) delete holds[k];
     tc.querySelectorAll('.tc-btn.on').forEach(b => b.classList.remove('on'));
@@ -355,6 +356,7 @@
     if (round !== lastRd) { lastRd = round; tAim = null; }
     if (tAim == null) { const m = myState(); if (m && Number.isFinite(m.a)) tAim = m.a; }
     const sp = canSpec(); if (sp !== specNow) { specNow = sp; applyZones(); }
+    if (tAim != null) TA.face = tAim;   // o personagem encara a mira (andar não muda)
     if (tAim != null) {   // transforma o ângulo do analógico numa posição de "mouse" ao redor do personagem
       const px = W / 2 + (pred.x - cam.x) * Z, py = H / 2 + (pred.y - cam.y) * Z;
       mouse.x = px + Math.cos(tAim) * 220; mouse.y = py + Math.sin(tAim) * 220;
