@@ -76,17 +76,6 @@
   // pausa e tela cheia
   const bPause = mk('button', 'tc-sys', top, '<b>II</b>'); bPause.type = 'button'; bPause.setAttribute('aria-label', 'Pausar');
   bPause.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setPaused(true); });
-  const canFs = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
-  if (canFs && !navigator.standalone) {
-    const bFs = mk('button', 'tc-sys', top, '<b>⛶</b>'); bFs.type = 'button'; bFs.setAttribute('aria-label', 'Tela cheia');
-    bFs.addEventListener('pointerdown', e => {
-      e.preventDefault(); e.stopPropagation();
-      const d = document, el = d.documentElement;
-      if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
-      const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' });
-      Promise.resolve(p).then(() => { try { screen.orientation.lock('landscape'); } catch { } }).catch(() => { });
-    });
-  }
 
   /* ---------------------------------------------------- LAYOUT SALVO
      Cada controle guarda o centro como fração da tela (x, y: 0..1) e um fator de tamanho (s).
@@ -359,6 +348,7 @@
     if (on !== wasOn) { wasOn = on; tc.classList.toggle('on', on); if (!on) releaseAll(); }
     document.body.classList.toggle('tcPlay', on);
     if (!on) return;
+    { const v = $('vitals'), r = $('roster'); if (v && r && v.offsetHeight > 0) { const t = Math.round(v.getBoundingClientRect().bottom + 6); if (r.dataset.t !== String(t)) { r.dataset.t = String(t); r.style.top = t + 'px'; } } }   // lista de jogadores sempre logo abaixo da vida, sem sobrepor
     { const m0 = myState(), showSl = !!(m0 && hasActive(m0.sk)); if (nodes.sl && nodes.sl.dataset.vis !== String(showSl)) { nodes.sl.dataset.vis = String(showSl); nodes.sl.style.display = showSl ? '' : 'none'; } }   // ATIVA: gorila (explosão) e Shadow 4 (gancho)
     if (tapUntil && now > tapUntil) { tapUntil = 0; if (A.id == null) mouse.down = false; }
     // mira: começa olhando para onde o servidor posicionou o boneco na rodada e depois só o analógico direito muda
