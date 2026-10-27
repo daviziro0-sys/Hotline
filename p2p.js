@@ -108,27 +108,28 @@ const P2P = (() => {
       if (c.p) return;
       const skin = SKINS.includes(m.skin) ? m.skin : m.skin === "HIPPO" ? "GORILLA" : "HERO";
       const name = String(m.name || "JOGADOR").replace(/[<>]/g, "").slice(0, 14);
+      const look = skin === "TIGER" && m.look === "preto" ? "preto" : "";
       if (m.mode === "create") {
         if (!c.local || this.room || this.opening) return;
         this.opening = true;
-        return this.openRoom(c, m, skin, name);
+        return this.openRoom(c, m, skin, name, look);
       }
       const code = String(m.room || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
       if (!this.room || code !== this.room.code) return this.reply(c, { type: "noroom" });
-      this.seat(c, skin, name);
+      this.seat(c, skin, name, look);
     }
 
-    seat(c, skin, name) {
+    seat(c, skin, name, look) {
       const game = this.room.game;
       if (game.count >= game.maxPlayers) return this.reply(c, { type: "full" });
-      c.p = game.addPlayer(c.id, name, skin);
+      c.p = game.addPlayer(c.id, name, skin, look);
       if (!c.p) return this.reply(c, { type: "full" });
       this.room.clients.add(c);
       this.reply(c, { type: "joined", id: c.id, slot: c.p.slot, room: this.room.code });
     }
 
     // registra "sh7x-XXXX" no broker do PeerJS (tenta outro código se já estiver em uso)
-    openRoom(c, m, skin, name) {
+    openRoom(c, m, skin, name, look) {
       let tries = 0;
       const fail = why => {
         this.opening = false;
@@ -150,7 +151,7 @@ const P2P = (() => {
             game: new Shared.Game(Shared.sanitizeRoomCfg(Object.assign({ map: m.map }, m.cfg))),
             clients: new Set(),
           };
-          this.seat(c, skin, name);
+          this.seat(c, skin, name, look);
           this.begin();
         });
         peer.on("error", e => {

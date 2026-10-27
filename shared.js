@@ -828,10 +828,10 @@
     get count() { return this.players.filter(Boolean).length; }
     byId(id) { return this.players.find(p => p && p.id === id) || null; }
 
-    addPlayer(id, name, skin) {
+    addPlayer(id, name, skin, look) {
       const slot = this.players.findIndex(q => !q);
       if (slot < 0 || slot >= this.maxPlayers) return null;   // sala cheia (limite escolhido na criação)
-      const p = { id, slot, name: String(name || 'JOGADOR').slice(0, 14), skin: skin || 'HERO', color: randomColor(this.players.filter(Boolean).map(q => q.color)), x: 0, y: 0, angle: 0, alive: true, down: false, downT: 0, hp: maxHpOf(skin || 'HERO'),
+      const p = { id, slot, name: String(name || 'JOGADOR').slice(0, 14), skin: skin || 'HERO', look: (skin === 'TIGER' && look === 'preto') ? 'preto' : '', color: randomColor(this.players.filter(Boolean).map(q => q.color)), x: 0, y: 0, angle: 0, alive: true, down: false, downT: 0, hp: maxHpOf(skin || 'HERO'),
         inv: [null, null], sel: 0, swcd: 0, cd: 0, swing: 0, buf: 0, fire: false, budget: 0.3, ack: 0, score: 0, kills: 0, bot: false, spawnIdx: -1, healT: 0, charging: false, chg: 0, tc: false, dcd: 0, actCd: 0, aimD: HOOK_RANGE, emT: 0, emCd: 0, sui: 0, ct: false, dive: false, air: DIVE_AIR };
       // inventário de 2 espaços: `weapon` continua sendo a arma NA MÃO (o espaço selecionado), então todo o resto do código funciona igual
       Object.defineProperty(p, 'weapon', { get() { return this.inv[this.sel]; }, set(v) { this.inv[this.sel] = v; }, enumerable: false, configurable: true });
@@ -1213,7 +1213,7 @@
       v.alive = false; v.down = false; v.fire = false; v.charging = false;
       if (by && by !== v) by.kills = (by.kills | 0) + 1;
       this.dropAll(v, Math.cos(a) * 120, Math.sin(a) * 120);
-      this.events.push({ t: 'kill', id: v.id, x: v.x, y: v.y, a, how, w, by: by ? by.id : null, sk: v.skin, dk: wasDk });   // w = arma que matou (escolhe o sprite de morte)
+      this.events.push({ t: 'kill', id: v.id, x: v.x, y: v.y, a, how, w, by: by ? by.id : null, sk: v.skin, lk: v.look || 0, dk: wasDk });   // w = arma que matou (escolhe o sprite de morte)
     }
     knockdown(p, dur, a, keepWeapon = false) {   // keepWeapon: só atordoa, a arma continua na mão (gancho do Shadow 4)
       if (!p.alive || p.down || p.dive) return;
@@ -1683,7 +1683,7 @@
         cf: [this.winScore, this.roundTime, this.maxPlayers, this.healOn ? 1 : 0, this.weaponMul, this.mapPref || ''],   // config da sala
         map: this.level ? this.level.id : null, fc: this.level ? this.level.fc : [], win: this.winner, host: this.hostId(),
         pl: this.players.filter(Boolean).map(p => ({
-          id: p.id, dv: p.dive ? 1 : 0, ai: +(p.air / DIVE_AIR).toFixed(2), sl: p.slot, nm: p.name, sk: p.skin, cl: p.color, sc: p.score, kl: p.kills | 0, x: r1(p.x), y: r1(p.y), a: Math.round(p.angle * 100) / 100,
+          id: p.id, dv: p.dive ? 1 : 0, ai: +(p.air / DIVE_AIR).toFixed(2), sl: p.slot, nm: p.name, sk: p.skin, lk: p.look || 0, cl: p.color, sc: p.score, kl: p.kills | 0, x: r1(p.x), y: r1(p.y), a: Math.round(p.angle * 100) / 100,
           hp: Math.round(p.hp), hz: +Math.max(0, p.healT).toFixed(2), al: p.alive ? 1 : 0, dn: p.down ? 1 : 0, dt: +Math.max(0, p.downT).toFixed(2),
           w: p.weapon ? p.weapon.type : 0, am: p.weapon ? p.weapon.ammo : 0, se: p.sel, iv: p.inv.map(x => x ? [x.type, x.ammo] : 0), bot: p.bot ? 1 : 0, ch: p.charging ? +(p.chg / spearChargeOf(p.skin)).toFixed(2) : -1,
           cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (hq => hq ? hq.slot + 1 : 0)(this.byId(p.hook.id)) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
