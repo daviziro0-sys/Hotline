@@ -1,7 +1,7 @@
 'use strict';
 /* ==========================================================================
    7 SHADOWS — controles de toque (celular / tablet)
-   Esquerda: analógico de movimento · Direita: analógico de mira (empurrar = atirar)
+   Esquerda: analógico de movimento · Direita: analógico de mira (arrastar mira, soltar ataca; toque rápido = mira automática)
    A MIRA só muda com o analógico direito: andar não mexe nela.
    Botões: ativa, pegar, jogar, curar, trocar arma · slots do inventário tocáveis
    Tela "Ajustar controles": arrastar cada controle, tamanho, opacidade e analógico fixo/flutuante.
@@ -14,7 +14,7 @@
   const mk = (tag, cls, parent, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; };
   const BASE_R = 58;       // raio do analógico no tamanho 100% (px)
   const DEAD = 0.22;       // zona morta do movimento
-  const FIRE = 0.5;        // quanto empurrar o analógico de mira para atirar
+  // mira: arrastar o analógico direito mostra a mira; soltar ataca; toque rápido = mira automática
   const SZ_MIN = 0.5, SZ_MAX = 2;
 
   /* controles que podem ser ajustados: sticks são círculos de 116 px; botões têm w x h (px) no tamanho 100% */
@@ -145,7 +145,7 @@
   const L = { id: null, ox: 0, oy: 0 };                                           // movimento
   const A = { id: null, ox: 0, oy: 0, sx: 0, sy: 0, firing: false, t0: 0, moved: 0 };   // mira
   let tAim = null;      // ângulo de mira (rad): só o analógico direito muda
-  let tapUntil = 0, lastRd = -2;
+  let lastRd = -2;
 
   const place = (base, x, y) => { base.style.transform = `translate(${x}px,${y}px)`; base.classList.add('on'); };
   const knob = (k, dx, dy) => { k.style.transform = `translate(${dx}px,${dy}px)`; };
@@ -179,10 +179,12 @@
 
   function endAim() {
     if (A.id == null) return;
-    const quick = performance.now() - A.t0 < 220 && A.moved < 14;
+    const was = A.manual, ang = tAim;
     A.id = null; baseR.classList.remove('on'); baseR.classList.remove('fire'); ghostR.style.opacity = '';
-    mouse.down = false; A.firing = false;
-    if (quick && !canSpec()) { edge.fp = true; mouse.down = true; tapUntil = performance.now() + 90; }   // toque rápido = um tiro/golpe para onde olha
+    A.firing = false; A.manual = false; TA.on = false; TA.man = false;
+    if (!mode || paused || canSpec()) return;
+    if (was && ang != null) taFire(ang);                       // arrastou e soltou = ataca na direção da mira
+    else { const a = taAuto(); taFire(a !== null ? a : (ang != null ? ang : TA.face)); }   // toque rápido = mira automática no inimigo mais próximo
   }
   function moveA(e) {
     const R = rad('aim');
@@ -191,15 +193,14 @@
     if (!fixedMode && d > R * 1.5) { const k = (d - R * 1.5) / d; A.ox += dx * k; A.oy += dy * k; place(baseR, A.ox, A.oy); dx = e.clientX - A.ox; dy = e.clientY - A.oy; d = Math.hypot(dx, dy); }
     const c = d > R ? R / d : 1; knob(knobR, dx * c, dy * c);
     if (d > 8) tAim = Math.atan2(dy, dx);
-    const fire = d / R >= FIRE;
-    if (fire && !A.firing) { A.firing = true; mouse.down = true; edge.fp = true; }
-    else if (!fire && A.firing) { A.firing = false; mouse.down = false; }
-    baseR.classList.toggle('fire', fire);
+    A.manual = d / R >= DEAD;                                  // passou da zona morta = está mirando
+    TA.on = true; TA.man = A.manual; if (A.manual) TA.ang = tAim;   // o game.js desenha a mira e usa este ângulo
+    baseR.classList.toggle('fire', A.manual);
   }
   zoneR.addEventListener('pointerdown', e => {
     if (A.id != null) return; e.preventDefault(); initAudio();
     if (canSpec()) { specStep(1); return; }    // espectando: toque troca de jogador
-    A.id = e.pointerId; A.sx = e.clientX; A.sy = e.clientY; A.t0 = performance.now(); A.moved = 0; A.firing = false;
+    A.id = e.pointerId; A.sx = e.clientX; A.sy = e.clientY; A.t0 = performance.now(); A.moved = 0; A.firing = false; A.manual = false;
     try { zoneR.setPointerCapture(e.pointerId); } catch { }
     if (fixedMode && home.aim) { A.ox = home.aim.x; A.oy = home.aim.y; } else { A.ox = e.clientX; A.oy = e.clientY; }
     place(baseR, A.ox, A.oy); knob(knobR, 0, 0); ghostR.style.opacity = '0';
@@ -333,7 +334,7 @@
   let wasOn = false;
   function releaseAll() {
     endMove(); if (A.id != null) { A.id = null; baseR.classList.remove('on'); ghostR.style.opacity = ''; }
-    A.firing = false; mouse.down = false; keys.f = false;
+    A.firing = false; A.manual = false; TA.on = false; TA.man = false; mouse.down = false; keys.f = false;
     for (const k in holds) delete holds[k];
     tc.querySelectorAll('.tc-btn.on').forEach(b => b.classList.remove('on'));
   }
@@ -350,7 +351,6 @@
     if (!on) return;
     { const v = $('vitals'), r = $('roster'); if (v && r && v.offsetHeight > 0) { const t = Math.round(v.getBoundingClientRect().bottom + 6); if (r.dataset.t !== String(t)) { r.dataset.t = String(t); r.style.top = t + 'px'; } } }   // lista de jogadores sempre logo abaixo da vida, sem sobrepor
     { const m0 = myState(), showSl = !!(m0 && hasActive(m0.sk)); if (nodes.sl && nodes.sl.dataset.vis !== String(showSl)) { nodes.sl.dataset.vis = String(showSl); nodes.sl.style.display = showSl ? '' : 'none'; } }   // ATIVA: gorila (explosão) e Shadow 4 (gancho)
-    if (tapUntil && now > tapUntil) { tapUntil = 0; if (A.id == null) mouse.down = false; }
     // mira: começa olhando para onde o servidor posicionou o boneco na rodada e depois só o analógico direito muda
     if (round !== lastRd) { lastRd = round; tAim = null; }
     if (tAim == null) { const m = myState(); if (m && Number.isFinite(m.a)) tAim = m.a; }
