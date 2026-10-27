@@ -119,8 +119,27 @@ function headScan(e,k,img,memo){if(!(img.complete&&img.naturalWidth>0))return nu
     if(H.d[o+3]>0&&r>=170&&r<=225&&g>=135&&g<=200&&b>=30&&b<=110&&r-g>15){n++;xx<mx&&(mx=xx);xx>Mx&&(Mx=xx);y<my&&(my=y);y>My&&(My=y)}}
   return H.f[k]=n>=6?[(mx+Mx+1)/2,(my+My+1)/2]:null}
 /* cabeca de cada quadro. No Shadow 2 usa o sprite s2_ (o que de fato aparece na tela); se nao achar cabelo la, cai no sprite do heroi */
+/* Shadow 2: a cabeca e DOURADA (cabelo/aro amarelo). Acha todos os pixels dourados do quadro, pega o maior grupo conectado e centraliza no meio dele */
+const headMemoS2b=new Map;
+const isGold=(r,g,b,a)=>a>=200&&r>=120&&g>=120&&b<=70&&r>=g&&r-g<=60;
+function headScanGold(e,k,img){
+  if(!(img.complete&&img.naturalWidth>0))return null;
+  let H=headMemoS2b.get(e);if(!H){const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext("2d",{willReadFrequently:!0});_s2di.call(x,img,0,0);H={d:x.getImageData(0,0,c.width,c.height).data,w:c.width,h:c.height,f:[]};headMemoS2b.set(e,H)}
+  if(k in H.f)return H.f[k];
+  const fw=e.fw,fh=Math.min(e.fh||H.h,H.h),ox=k*fw;
+  if(ox+fw>H.w)return H.f[k]=null;
+  const m=new Uint8Array(fw*fh);let tot=0;
+  for(let y=0;y<fh;y++)for(let x=0;x<fw;x++){const o=(y*H.w+ox+x)*4;if(isGold(H.d[o],H.d[o+1],H.d[o+2],H.d[o+3])){m[y*fw+x]=1;tot++}}
+  if(tot<6)return H.f[k]=null;
+  /* grupos conectados (ponte de ate 6px para unir as partes da cabeca) */
+  const seen=new Uint8Array(fw*fh);let best=null;
+  for(let s=0;s<m.length;s++){if(!m[s]||seen[s])continue;const st=[s];seen[s]=1;let n=0,mx=1e9,Mx=-1,my=1e9,My=-1;
+    while(st.length){const c=st.pop(),cx=c%fw,cy=(c/fw)|0;n++;cx<mx&&(mx=cx);cx>Mx&&(Mx=cx);cy<my&&(my=cy);cy>My&&(My=cy);
+      for(let dy=-6;dy<=6;dy++)for(let dx=-6;dx<=6;dx++){const nx=cx+dx,ny=cy+dy;if(nx<0||nx>=fw||ny<0||ny>=fh)continue;const q=ny*fw+nx;if(m[q]&&!seen[q]){seen[q]=1;st.push(q)}}}
+    if(!best||n>best.n)best={n,mx,Mx,my,My}}
+  return H.f[k]=best&&best.n>=6?[(best.mx+best.Mx+1)/2,(best.my+best.My+1)/2]:null}
 function headOf(e,k){
-  if(curS2){const t=S2I[e.img.src.split("?")[0].split("/").pop()];if(t&&t!==e.img){const h=headScan(e,k,t,headMemoS2);if(h)return h}}
+  if(curS2){const t=S2I[e.img.src.split("?")[0].split("/").pop()];if(t&&t!==e.img){const h=headScanGold(e,k,t);if(h)return h}}
   return headScan(e,k,e.img,headMemo)}
 /* ajuste fino da mascara do Shadow 2, em pixels do sprite (+x = frente, +y = para baixo). Deixe [0,0] se estiver alinhada */
 const S2_MASK_OFF=[0,0];
