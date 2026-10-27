@@ -65,11 +65,12 @@ HS.mO={img:spImg("shadow4_coruja_colocando_mascara_cabelo.png"),fw:56,fh:48,cx:2
 HS.mR={img:spImg("shadow4_galo_colocando_mascara_cabelo.png"),fw:56,fh:48,cx:20.37,cy:23.87,rc:[[124,37,64],[83,24,42]]};
 HS.mG={img:spImg("shadow2_colocando_mascara.png"),fw:56,fh:48,cx:20.37,cy:23.87,rc:[[30,46,110],[20,30,73]]};
 /* RETRATO ANIMADO DO SHADOW 4 (menu de personagens + HUD de vida): 36 quadros de 96x96 (cabelo balanca, respira, pisca no 1o ciclo) */
-var FACE_SHEET=spImg("shadow4_retrato_sheet.png"),FACE_N=36,faceAnim=new Map,FACE_DOR=spImg("shadow4_retrato_dor_sheet.png"),FACE_DOR_N=6,FACE_DOR_MS=600,facePain=-1e9;
+var FACE_SHEET=spImg("shadow4_retrato_sheet.png"),FACE_N=36,faceAnim=new Map,FACE_DOR=spImg("shadow4_retrato_dor_sheet.png"),FACE_DOR_N=6,FACE_DOR_MS=600,facePain=-1e9,FACE_S2=spImg("sprite3_retrato_sheet.png"),FACE_S2_DOR=spImg("sprite3_retrato_dor_sheet.png"),faceSkin=new Map;
+function faceSet(sk){return sk==="GORILLA"?{s:FACE_S2,d:FACE_S2_DOR}:{s:FACE_SHEET,d:FACE_DOR}}
 function FACE_K(){return Math.floor(performance.now()/110)%FACE_N}
-function faceOk(){return FACE_SHEET.complete&&FACE_SHEET.naturalWidth>0}
+function faceOk(sk){const i=faceSet(sk).s;return i.complete&&i.naturalWidth>0}
 function facePic(g,t,k,SS){SS=SS||FACE_SHEET;const dw=t.width,dh=t.height-6;let sw=96,sh=96,sx=0;if(dw/dh>1)sh=96*dh/dw;else{sw=96*dw/dh;sx=(96-sw)/2}g.imageSmoothingEnabled=!1;g.drawImage(SS,k*96+sx,0,sw,sh,0,0,dw,dh)}
-setInterval(()=>{if(document.hidden||!faceOk())return;const k=FACE_K(),_pe=performance.now()-facePain,_pk=_pe<FACE_DOR_MS&&FACE_DOR.complete&&FACE_DOR.naturalWidth>0?Math.min(FACE_DOR_N-1,_pe/FACE_DOR_MS*FACE_DOR_N|0):-1;for(const[c,col]of faceAnim){if(!c.isConnected){faceAnim.delete(c);continue}if(c.offsetParent===null)continue;const g=c.getContext("2d");g.setTransform(1,0,0,1,0,0),g.clearRect(0,0,c.width,c.height),g.fillStyle="rgba(0,0,0,.35)",g.fillRect(0,0,c.width,c.height),_pk>=0&&c.classList.contains("v-face")?facePic(g,c,_pk,FACE_DOR):facePic(g,c,k),g.fillStyle=col||"#e2a93b",g.fillRect(0,c.height-6,c.width,6)}},55);
+setInterval(()=>{if(document.hidden)return;const k=FACE_K(),_pe=performance.now()-facePain,_pq=_pe<FACE_DOR_MS?Math.min(FACE_DOR_N-1,_pe/FACE_DOR_MS*FACE_DOR_N|0):-1;for(const[c,col]of faceAnim){if(!c.isConnected){faceAnim.delete(c);faceSkin.delete(c);continue}if(c.offsetParent===null)continue;const sk=faceSkin.get(c),fs=faceSet(sk);if(!faceOk(sk))continue;const _pk=_pq>=0&&fs.d.complete&&fs.d.naturalWidth>0?_pq:-1;const g=c.getContext("2d");g.setTransform(1,0,0,1,0,0),g.clearRect(0,0,c.width,c.height),g.fillStyle="rgba(0,0,0,.35)",g.fillRect(0,0,c.width,c.height),_pk>=0&&c.classList.contains("v-face")?facePic(g,c,_pk,fs.d):facePic(g,c,k,fs.s),g.fillStyle=col||"#e2a93b",g.fillRect(0,c.height-6,c.width,6)}},55);
 const MK_T0=.35,MK_DT=.09,MK_N=14,mkS={on:0,r:-1,max:0};
 function mkTick(){const ph=snap&&snap.ph;if(ph!=="countdown"){mkS.on=0;return}if(!mkS.on||mkS.r!==round){mkS.on=1;mkS.r=round;mkS.max=0}const tm=snap.tm||0;tm>mkS.max&&(mkS.max=tm)}
 function mkSheet(t){if(t.sk==="GORILLA")return HS.mG;if(t.sk==="HERO")return maskOf(t.id)===1?HS.mO:HS.mR;return null}
