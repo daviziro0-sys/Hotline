@@ -1215,11 +1215,11 @@
       this.dropAll(v, Math.cos(a) * 120, Math.sin(a) * 120);
       this.events.push({ t: 'kill', id: v.id, x: v.x, y: v.y, a, how, w, by: by ? by.id : null, sk: v.skin, dk: wasDk });   // w = arma que matou (escolhe o sprite de morte)
     }
-    knockdown(p, dur, a) {
+    knockdown(p, dur, a, keepWeapon = false) {   // keepWeapon: só atordoa, a arma continua na mão (gancho do Shadow 4)
       if (!p.alive || p.down || p.dive) return;
       p.hook = null; p.hookOn = false;
       p.down = true; p.downT = dur; p.fire = false; p.wasDual = !!p.dualOn;   // Shadow 7: caído continua com a máscara preta se estava no modo dupla
-      this.dropWeapon(p, Math.cos(a) * 220, Math.sin(a) * 220);
+      if (!keepWeapon) this.dropWeapon(p, Math.cos(a) * 220, Math.sin(a) * 220);
       this.events.push({ t: 'down', id: p.id, x: p.x, y: p.y, a });
     }
     // EMOTE: liga/desliga a dancinha (puramente visual; o estado vai no snapshot como `em`)
@@ -1290,7 +1290,7 @@
       }
       p.fire = false; p.buf = 0;
       if (best) {
-        this.knockdown(best, HOOK_STUN, p.angle);
+        this.knockdown(best, HOOK_STUN, p.angle, true);   // o gancho só atordoa: NÃO tira a arma da mão do inimigo
         if (best.down && best.downT < HOOK_STUN) best.downT = HOOK_STUN;
         p.hook = { id: best.id, t: HOOK_MAX_T }; p.actCd = HOOK_CD;
         this.events.push({ t: 'hook', id: p.id, x: p.x, y: p.y, a: Math.atan2(best.y - p.y, best.x - p.x), miss: 0 });
