@@ -1,0 +1,12 @@
+{
+  "name": "7 SHADOWS",
+  "short_name": "7 SHADOWS",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#0a1a4a",
+  "lang": "pt-BR"
+}
