@@ -932,7 +932,7 @@
         this.addItem(type, (x + 0.5) * TILE + jx, (y + 0.5) * TILE + jy);
         this.addItem(type, (L.W - x - 0.5) * TILE - jx, (L.H - y - 0.5) * TILE - jy);
       }
-      for (const [x, y] of (L.m.bottles || [])) this.addItem('WINE', (x + 0.5) * TILE, (y + 0.5) * TILE);   // garrafas de vinho do mapa (só a CASA COM QUINTAL define)
+      for (const [x, y] of (L.m.bottles || [])) this.addItem('WINE', (x + 0.5) * TILE, (y + 0.5) * TILE).ot = 1;   // garrafas de vinho do mapa (só a CASA COM QUINTAL define)
       this.phase = 'countdown'; this.timer = 2.8;
       this.events.push({ t: 'round' });
     }
@@ -1431,8 +1431,8 @@
       let best = null, bd = PICK_R;
       for (const it of this.items) {
         if (it.thrown || !canHold(p.skin, it.type)) continue;   // Shadow 4 só pega corpo a corpo
-        // V (bottle=true): só garrafas (inclusive em cima da mesa). E: tudo, e garrafa só depois de sair da mesa (no chão)
-        if (bottle ? !isBottle(it.type) : (isBottle(it.type) && (it.vo || this.level.onTable(it.x, it.y)))) continue;
+        // V (bottle=true): só garrafas (inclusive em cima da mesa). E: tudo; garrafa só depois de sair da mesa (it.ot = parada na mesa de origem)
+        if (bottle ? !isBottle(it.type) : (isBottle(it.type) && it.ot)) continue;
         const d = itemDistOn(this.level, it.type, it.x, it.y, it.rot, p.x, p.y);
         if (d < bd && (this.level.onTable(it.x, it.y) || this.level.los(p.x, p.y, it.x, it.y))) { bd = d; best = it; }   // item na mesa: o próprio móvel não conta como parede   // não pega arma do outro lado da parede
       }
@@ -1602,6 +1602,7 @@
 
     updateItems(dt) {
       for (const it of this.items) {
+        if (it.ot && (it.thrown || it.vx || it.vy)) it.ot = 0;   // saiu da mesa: a garrafa passa a poder ser pega com E
         if (it.thrown) {
           const sp = hyp(it.vx, it.vy), n = Math.max(1, Math.ceil(sp * dt / 8));
           const sx = it.vx * dt / n, sy = it.vy * dt / n; let stop = false;
@@ -1620,8 +1621,7 @@
               if (dh) { const m = 0.6 + wgt * 0.3; this.shotDoor(dh, { x: nx, y: ny, vx: it.vx * m, vy: it.vy * m, owner: it.owner }); this.events.push({ t: 'door', i: dh.i, dir: 0, x: nx, y: ny, hit: false }); }
             }
             if (this.level.solidAt(nx, ny) || this.level.doorAt(nx, ny, 3)) {
-              if (isBottle(it.type) && this.level.rnd.size && this.level.rnd.has(Math.floor(ny / TILE) * this.level.W + Math.floor(nx / TILE))) it.vo = 1;   // bateu num objeto redondo: só se equipa com V
-              if (WEAPONS[it.type].brk && this.level.solidAt(nx, ny)) {   // garrafa arremessada na parede: estilhaça e fica a garrafa quebrada no chão
+                            if (WEAPONS[it.type].brk && this.level.solidAt(nx, ny)) {   // garrafa arremessada na parede: estilhaça e fica a garrafa quebrada no chão
                 it.type = WEAPONS[it.type].brk; it.ammo = 0;
                 this.events.push({ t: 'shatter', x: it.x, y: it.y, a: Math.atan2(it.vy, it.vx), by: it.owner });
               }
@@ -1689,7 +1689,7 @@
           cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (hq => hq ? hq.slot + 1 : 0)(this.byId(p.hook.id)) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
         })),
         b: this.bullets.map(b => [b.id, r1(b.x), r1(b.y), Math.round(b.vx), Math.round(b.vy), (b.owner in slotOf ? slotOf[b.owner] : -1), b.r || 0]),   // [5] = slot de quem atirou (o cliente usa para não duplicar o tiro previsto)
-        it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0, i.vo ? 1 : 0]),
+        it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0, i.ot ? 1 : 0]),
         pw: this.level ? this.level.pw.reduce((m, v, i) => m | (v ? 0 : (1 << i)), 0) : 0,   // pw = bitmask dos quadros de energia BALEADOS
         lo: this.level ? this.level.lt.reduce((m, v, i) => m | (v ? 0 : (1 << i)), 0) : 0,   // lo = bitmask dos cômodos com a luz APAGADA
         dr: this.level ? this.level.doors.filter(d => !d.latched).map(d => [d.i, Math.round(d.phi * 1000) / 1000, Math.round(d.w * 100) / 100]) : [],
