@@ -16,12 +16,15 @@ const P2P = (() => {
   const MY_TURN = [
     // { urls: ["turn:SEU_HOST:3478", "turns:SEU_HOST:443?transport=tcp"], username: "USUARIO", credential: "SENHA" },
   ];
-  const OPTS = MY_TURN.length ? { debug: 0, config: { iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
+  // Lista ICE sempre explícita: vários STUN + TURNs de reserva (UDP e TCP/443), para furar NAT/CGNAT/4G.
+  const OPTS = { debug: 0, config: { iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302", "stun:global.stun.twilio.com:3478"] },
     { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" },
     ...MY_TURN,
-  ] } } : { debug: 0 };
-  const RELIABLE = false;                    // false = canal NÃO ORDENADO (sem bloqueio de cabeça de fila: um pacote perdido não trava os seguintes). O cliente descarta snapshots fora de ordem pelo campo "n". Ponha true para voltar ao canal ordenado.
+  ], iceCandidatePoolSize: 4 } };
+  const RELIABLE = true;                     // canal ORDENADO e confiável (o mesmo do OUTCOME, que conecta). O modo não ordenado (false) estava impedindo/atrasando a entrada do 2º jogador. O cliente já descarta snapshots velhos pelo campo "n".
+  const GUEST_TIMEOUT = 20000;               // tempo máximo por tentativa de conexão do convidado (TURN pode demorar)
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const SKINS = ["HERO", "ROOSTER", "TIGER", "BEAR", "MONKEY", "WOLF", "GORILLA", "FISH"];
   const STEP = 1 / 60;
@@ -303,7 +306,7 @@ const P2P = (() => {
         if (this.done || this.opened || this.peer !== peer) return;
         this.tries < 3 ? this.attempt() : this.fail(why);
       };
-      this.to = setTimeout(() => retry("timeout"), 10000);
+      this.to = setTimeout(() => retry("timeout"), GUEST_TIMEOUT);
       peer.on("open", () => {
         if (this.done || this.peer !== peer) return;
         const conn = this.conn = peer.connect(PFX + this.room, { reliable: RELIABLE });
