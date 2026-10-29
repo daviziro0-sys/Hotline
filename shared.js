@@ -837,7 +837,7 @@
     addPlayer(id, name, skin, look) {
       const slot = this.players.findIndex(q => !q);
       if (slot < 0 || slot >= this.maxPlayers) return null;   // sala cheia (limite escolhido na criação)
-      const p = { id, slot, name: String(name || 'JOGADOR').slice(0, 14), skin: skin || 'HERO', look: (skin === 'TIGER' && look === 'preto') ? 'preto' : '', color: randomColor(this.players.filter(Boolean).map(q => q.color)), x: 0, y: 0, angle: 0, alive: true, down: false, downT: 0, hp: maxHpOf(skin || 'HERO'),
+      const p = { id, slot, name: String(name || 'JOGADOR').slice(0, 14), skin: skin || 'HERO', look: (skin === 'TIGER' && look === 'preto') ? 'preto' : (skin === 'HERO' && look === 'subaru') ? 'subaru' : '', color: randomColor(this.players.filter(Boolean).map(q => q.color)), x: 0, y: 0, angle: 0, alive: true, down: false, downT: 0, hp: maxHpOf(skin || 'HERO'),
         inv: [null, null], sel: 0, swcd: 0, cd: 0, swing: 0, buf: 0, fire: false, budget: 0.3, ack: 0, score: 0, kills: 0, bot: false, spawnIdx: -1, healT: 0, charging: false, chg: 0, tc: false, dcd: 0, actCd: 0, aimD: HOOK_RANGE, emT: 0, emCd: 0, sui: 0, ct: false, dive: false, air: DIVE_AIR };
       // inventário de 2 espaços: `weapon` continua sendo a arma NA MÃO (o espaço selecionado), então todo o resto do código funciona igual
       Object.defineProperty(p, 'weapon', { get() { return this.inv[this.sel]; }, set(v) { this.inv[this.sel] = v; }, enumerable: false, configurable: true });

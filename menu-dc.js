@@ -10,7 +10,8 @@
    Para o jogo desenhar a skin, o id também precisa existir no código (game1.js / game2.js / shared.js / p2p.js).
    --------------------------------------------------------------------------- */
 window.SKIN_LOOKS = window.SKIN_LOOKS || {
-  TIGER: [{ id: 'preto', name: 'Sobretudo Preto', desc: ['Sobretudo e fedora pretos', 'Só muda o visual'], face: 'sprites/s7p_retrato.png' }]
+  TIGER: [{ id: 'preto', name: 'Sobretudo Preto', desc: ['Sobretudo e fedora pretos', 'Só muda o visual'], face: 'sprites/s7p_retrato.png' }],
+  HERO: [{ id: 'subaru', name: 'Subaru', desc: ['Visual Subaru', 'Só muda o visual'], face: 'sprites/sub_retrato.png' }]
 };
 
 (() => {
