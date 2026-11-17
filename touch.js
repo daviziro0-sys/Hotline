@@ -177,11 +177,12 @@
   const upL = e => { if (e.pointerId === L.id) endMove(); };
   zoneL.addEventListener('pointerup', upL); zoneL.addEventListener('pointercancel', upL);
 
-  function endAim() {
+  function endAim(cancelled) {
     if (A.id == null) return;
     const was = A.manual, ang = tAim;
     A.id = null; baseR.classList.remove('on'); baseR.classList.remove('fire'); ghostR.style.opacity = '';
     A.firing = false; A.manual = false; TA.on = false; TA.man = false;
+    if (cancelled) return;   // pointercancel (gesto do sistema, ligação, etc.) não deve atacar
     if (!mode || paused || canSpec()) return;
     if (was && ang != null) taFire(ang);                       // arrastou e soltou = ataca na direção da mira
     else { const a = taAuto(), fa = a !== null ? a : (ang != null ? ang : TA.face); tAim = fa; taFire(fa); }   // toque rápido = mira automática no inimigo mais próximo
@@ -208,7 +209,7 @@
     if (fixedMode) moveA(e);
   });
   zoneR.addEventListener('pointermove', e => { if (e.pointerId !== A.id) return; e.preventDefault(); moveA(e); });
-  const upR = e => { if (e.pointerId === A.id) endAim(); };
+  const upR = e => { if (e.pointerId === A.id) endAim(e.type === 'pointercancel'); };
   zoneR.addEventListener('pointerup', upR); zoneR.addEventListener('pointercancel', upR);
 
   /* ----------------------------------------- slots do inventário (toque) */

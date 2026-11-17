@@ -82,22 +82,9 @@
   const canHold = (skin, type) => !(SKIN_STATS[skin] && SKIN_STATS[skin].meleeOnly) || !!(WEAPONS[type] && WEAPONS[type].melee);   // quem só usa corpo a corpo não pega arma de fogo
   const maxHpOf = skin => MAX_HP * ((SKIN_STATS[skin] && SKIN_STATS[skin].hpMul) || 1);          // vida máxima do personagem
   const healPctOf = skin => (SKIN_STATS[skin] && SKIN_STATS[skin].healPct) || HEAL_PCT;          // % da PRÓPRIA vida máxima que a cura devolve
-  const DUAL_FWD = 16 * CS;   // modo dupla: as armas longas ficam 16 unidades (do desenho) mais à frente, com os braços esticados — o cano sai dessa distância a mais
-  const dualFwdOf = type => (type === 'PISTOL' || type === 'REVOLVER') ? 0 : DUAL_FWD;   // pistola/revólver já ficam na ponta do braço
-  const TIGER_CAD = 0.85, PANTHER_CAD = 1.2, PANTHER_SPEED = 0.88, PANTHER_DMG = 1.25 * 1.1;   // pantera: equivale a 80% de vida (x1,25 de dano) + 10% de dano recebido a mais (x1,1) = x1,375   // Shadow 7: multiplicador do intervalo entre ataques (menor = mais cadência) e da velocidade
-  const cadMulOf = (skin, dualOn) => (SKIN_STATS[skin] && SKIN_STATS[skin].dual) ? (dualOn ? PANTHER_CAD : TIGER_CAD) : 1;
-  const gunCadOf = (skin, dualOn) => cadMulOf(skin, dualOn) * ((SKIN_STATS[skin] && SKIN_STATS[skin].gunCad) || 1);   // multiplicador do intervalo entre TIROS (menor = mais cadência)
-  const hasDual = skin => !!(SKIN_STATS[skin] && SKIN_STATS[skin].dual);                          // a ativa é o modo dupla (duas armas iguais ao mesmo tempo)
-  const canDual = p => {   // tem 2 armas do mesmo TIPO no inventário (mão + outro espaço)? Só assim o Shadow 7 pode usar a ativa
-    if (!p || !hasDual(p.skin) || !p.inv) return false;
-    const a = p.inv[p.sel], b = p.inv[1 - p.sel];
-    return !!(a && b && WEAPONS[a.type] && sameWeaponType(a.type, b.type));
-  };
-  // golpes extras do combo do Shadow 7 (armas gerais): 3 = giro 360°, 4 = perfuração dupla (longa e estreita), 5 = martelada (pesada e lenta)
-  const DUAL_MOVES = { 3: { r: 1.0, ar: Math.PI * 2, dm: 1.15, cd: 1.1 }, 4: { r: 1.45, ar: 0.55, dm: 1.3, cd: 0.95 }, 5: { r: 1.1, ar: 1.3, dm: 1.8, cd: 1.35 } };
-  const dualPair = p => {   // [arma da mão, arma do outro espaço] se o modo dupla está ligado e as duas armas são do mesmo tipo; senão null
-    return p && p.dualOn && canDual(p) ? [p.inv[p.sel], p.inv[1 - p.sel]] : null;
-  };
+  // Modo dupla do Shadow 7 REMOVIDO. Stubs mantidos so para o cliente (game1/game2) continuar carregando sem erro.
+  const DUAL_FWD = 0, dualFwdOf = () => 0, cadMulOf = () => 1, hasDual = () => false, canDual = () => false, dualPair = () => null;
+  const gunCadOf = skin => (SKIN_STATS[skin] && SKIN_STATS[skin].gunCad) || 1;   // multiplicador do intervalo entre TIROS (menor = mais cadencia)
   const hasActive = skin => !!(SKIN_STATS[skin] && SKIN_STATS[skin].active);                      // ativa (Espaço): gorila (explosão) e Shadow 4 (gancho)
   const healTimeOf = skin => (SKIN_STATS[skin] && SKIN_STATS[skin].healTime) || HEAL_TIME;       // segundos de cura
   const SWAP_TIME = 0.2;      // segundos para sacar a outra arma do inventário (2 espaços)
@@ -809,7 +796,6 @@
     { const wt = p.weapon ? p.weapon.type : p.wt; if (p.skin !== 'GORILLA' && WEAPON_SLOW[wt]) sm *= WEAPON_SLOW[wt]; }   // arma pesada deixa lento (Shadow 2 é imune); no cliente a previsão guarda o tipo em p.wt
     if (p.slowT > 0) sm *= ACT_SLOW;     // lentidão da explosão do Shadow 2
     if (p.shieldOn || p.shieldT > 0) sm *= SHIELD_SPEED;   // escudo do Shadow 7: anda devagar (no cliente a previsão usa shieldOn)
-    if (p.dualOn) sm *= PANTHER_SPEED;   // modo pantera (dupla) é mais lento
     if (p.fxSpd) sm *= p.fxSpd;          // buff/debuff da fonte
     sm *= speedMulOf(p.skin);   // passiva de velocidade do personagem (Shadow 4 anda mais rápido)
     if (level.waterAt(p.x, p.y)) sm *= (p.skin === 'FISH' ? FISH_WATER_FAST : WATER_SLOW);   // piscina: anda mais devagar (o PEIXE nada mais rápido)
@@ -860,7 +846,7 @@
       this.players[p.slot] = null;
       if (this.count < MIN_PLAYERS) {
         // sem adversários: volta para a sala de espera
-        for (const q of this.players) if (q) { q.score = 0; q.kills = 0; q.alive = true; q.hp = maxHpOf(q.skin); q.down = false; q.healT = 0; q.shieldT = 0; q.actCd = 0; q.hook = null; q.hookOn = false; q.dualOn = false; q.inv = [null, null]; q.sel = 0; q.swcd = 0; }
+        for (const q of this.players) if (q) { q.score = 0; q.kills = 0; q.alive = true; q.hp = maxHpOf(q.skin); q.down = false; q.healT = 0; q.shieldT = 0; q.actCd = 0; q.hook = null; q.hookOn = false; q.inv = [null, null]; q.sel = 0; q.swcd = 0; }
         this.phase = this.autoStart ? 'waiting' : 'lobby'; this.level = null; this.bullets = []; this.items = []; this.round = 0; this.mapIdx = -1;
       }
     }
@@ -872,7 +858,7 @@
       this.startMatch(); return true;
     }
     toLobby() {
-      for (const q of this.players) if (q) { q.score = 0; q.kills = 0; q.alive = true; q.hp = maxHpOf(q.skin); q.down = false; q.downT = 0; q.healT = 0; q.shieldT = 0; q.actCd = 0; q.hook = null; q.hookOn = false; q.dualOn = false; q.inv = [null, null]; q.sel = 0; q.swcd = 0; q.fire = false; }
+      for (const q of this.players) if (q) { q.score = 0; q.kills = 0; q.alive = true; q.hp = maxHpOf(q.skin); q.down = false; q.downT = 0; q.healT = 0; q.shieldT = 0; q.actCd = 0; q.hook = null; q.hookOn = false; q.inv = [null, null]; q.sel = 0; q.swcd = 0; q.fire = false; }
       this.phase = 'lobby'; this.level = null; this.bullets = []; this.items = []; this.round = 0; this.mapIdx = -1; this.winner = -1; this.tu = false; this.rt = 0;
     }
     nextSpawn() { return this.players.reduce((m, q) => (q && q.spawnIdx > m ? q.spawnIdx : m), -1) + 1; }
@@ -881,7 +867,7 @@
       p.spawnIdx = idx;
       p.x = (s[0] + 0.5) * TILE; p.y = (s[1] + 0.5) * TILE;
       p.angle = Math.atan2(this.level.H * TILE / 2 - p.y, this.level.W * TILE / 2 - p.x);
-      p.alive = true; p.hp = maxHpOf(p.skin); p.down = false; p.downT = 0; p.inv = [null, null]; p.sel = 0; p.swcd = 0; p.cd = 0; p.swing = 0; p.orbT = 0; p.buf = 0; p.fire = false; p.healT = 0; p.shieldT = 0; p.charging = false; p.chg = 0; p.tc = false; p.dcd = 0; p.actCd = 0; p.slowT = 0; p.dive = false; p.air = DIVE_AIR; p.hook = null; p.hookOn = false; p.dualOn = false; p.emT = 0; p.emCd = 0; p.sui = 0; p.ct = false; p.coinT = 0; p.coinUsed = false; p.coinRes = 0; p.coinFx = -1; p.fx = -1; p.fxSpd = 1; p.fxDmg = 1; p.fxCad = 1;
+      p.alive = true; p.hp = maxHpOf(p.skin); p.down = false; p.downT = 0; p.inv = [null, null]; p.sel = 0; p.swcd = 0; p.cd = 0; p.swing = 0; p.orbT = 0; p.buf = 0; p.fire = false; p.healT = 0; p.shieldT = 0; p.charging = false; p.chg = 0; p.tc = false; p.dcd = 0; p.actCd = 0; p.slowT = 0; p.dive = false; p.air = DIVE_AIR; p.hook = null; p.hookOn = false; p.emT = 0; p.emCd = 0; p.sui = 0; p.ct = false; p.coinT = 0; p.coinUsed = false; p.coinRes = 0; p.coinFx = -1; p.fx = -1; p.fxSpd = 1; p.fxDmg = 1; p.fxCad = 1;
     }
     startMatch() { for (const p of this.players) if (p) { p.score = 0; p.kills = 0; } this.round = 0; this.startRound(); }
     startRound() {
@@ -997,7 +983,7 @@
         if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0 || !p.alive || p.down) { p.shieldT = 0; this.events.push({ t: 'shield', id: p.id, x: p.x, y: p.y, on: 0 }); } }   // escudo acaba (tempo, morte ou derrubado pelo gancho)
         this.stepCoin(p, dt);
         if (p.orbT > 0) { p.orbT -= dt; if (p.orbT <= 0) { p.orbT = 0; if (p.alive && !p.down) this.spawnOrb(p); } }   // soco do gorila: solta a bola no ponto do golpe
-        p.cd -= dt; p.swcd -= dt; p.swing -= dt; p.buf -= dt; p.dcd -= dt; if (p.dcT > 0) p.dcT -= dt; if (p.actCd > 0) p.actCd = Math.max(0, p.actCd - dt); if (p.emCd > 0) p.emCd -= dt; p.budget = Math.min(0.3, p.budget + dt);
+        p.cd -= dt; p.swcd -= dt; p.swing -= dt; p.buf -= dt; p.dcd -= dt; if (p.actCd > 0) p.actCd = Math.max(0, p.actCd - dt); if (p.emCd > 0) p.emCd -= dt; p.budget = Math.min(0.3, p.budget + dt);
         if (p.charging) {   // lança: enquanto segura o botão de arremesso a força sobe; soltou = arremessa
           if (!p.alive || p.down || p.healT > 0 || !p.weapon || p.weapon.type !== 'SPEAR' || this.phase !== 'live') { p.charging = false; p.chg = 0; }
           else {
@@ -1030,9 +1016,6 @@
         this.timer -= dt;
         if (this.timer <= 0) { this.phase = 'live'; this.events.push({ t: 'go' }); }
       } else if (this.phase === 'live') {
-        for (const p of this.players) if (p && p.dualOn && !canDual(p)) {   // perdeu o par de armas (largou, arremessou, trocou, morreu...): a dupla desliga
-          p.dualOn = false; this.events.push({ t: 'dualeq', id: p.id, x: p.x, y: p.y, on: 0 });
-        }
         for (const p of this.players) this.stepDive(p, dt);
         for (const p of this.players) this.tryFire(p);
         for (const p of this.players) if (p && p.hook) this.stepHook(p, dt);   // Shadow 4: puxada do gancho
@@ -1067,7 +1050,8 @@
       let best = null, tie = false;
       for (const p of this.players) {
         if (!p || !p.alive) continue;
-        if (!best || p.hp > best.hp) { best = p; tie = false; } else if (p.hp === best.hp) tie = true;
+        const fr = p.hp / maxHpOf(p.skin), bf = best ? best.hp / maxHpOf(best.skin) : -1;
+        if (!best || fr > bf) { best = p; tie = false; } else if (fr === bf) tie = true;
       }
       this.endRound(best && !tie ? best : null);
     }
@@ -1089,44 +1073,9 @@
       if (!p.weapon && p.skin === 'GORILLA') { this.fireOrb(p); return; }   // Shadow 2 de mãos vazias: o soco É a bola de energia (curta, sai da mão)
       const wd = p.weapon ? WEAPONS[p.weapon.type] : WEAPONS.FISTS;
       if (wd.melee) {
-        // SHADOW 7 com 2 armas corpo a corpo do mesmo tipo (modo dupla): COMBO. Sem bater por ~0,5 s o combo volta ao início.
-        //  - geral (faca, machete, machado, katana, taco...): direita, esquerda (mais rápidos) e CRUZADO com as duas armas (arco x1,5, alcance x1,2, dano x1,6, recuperação lenta)
-        //  - LANÇA: ESTOCADA direita, SLASH esquerdo (varrida larga) e DUPLA ESTOCADA com as duas lanças juntas (alcance x1,3, dano x1,7)
-        //  - GARRAFA: rajada de 4 garrafadas alternando direita/esquerda (rápida) e ESMAGADA com as duas (arco x1,5, alcance x1,2, dano x1,6)
-        const dp = p.weapon ? dualPair(p) : null;
-        let dStep = -1, mRange = wd.range, mArc = wd.arc, mDmg = wd.dmg, mCd = wd.cd, cK = 0, cN = 3;
-        let dFin = false, dSpr = false, dBot = false;
-        if (dp) {
-          const spr = p.weapon.type === 'SPEAR', bot = isBottle(p.weapon.type);
-          cN = bot ? 5 : spr ? 3 : 6; cK = p.dcT > 0 ? (p.dc | 0) % cN : 0;
-          // armas gerais: combo de 6 golpes = direita, esquerda, GIRO (360°), PERFURAÇÃO dupla, MARTELADA e o CRUZADO final
-          const fin = cK === cN - 1; dStep = fin ? 2 : (spr || bot) ? cK % 2 : [0, 1, 3, 4, 5][cK]; dFin = fin; dSpr = spr; dBot = bot;
-          if (fin) {
-            if (spr) { mRange *= 1.3; mDmg *= 1.7; mCd *= 1.25; }
-            else if (bot) { mRange *= 1.2; mArc *= 1.5; mDmg *= 1.6; mCd *= 1.3; }
-            else { mRange *= 1.2; mArc *= 1.5; mDmg *= 1.6; mCd *= 1.25; }
-          } else if (dStep >= 3) {
-            const mv = DUAL_MOVES[dStep]; mRange *= mv.r; mArc = mv.ar; mDmg *= mv.dm; mCd *= mv.cd;
-          } else {
-            mCd *= bot ? 0.8 : 0.7;
-            if (spr && dStep === 1) { mArc = 1.9; mRange *= 0.85; }   // lança: o 2º golpe é um SLASH (varrida larga, alcance um pouco menor) com a lança esquerda
-          }
-        }
-        // MODO DUPLA: cada arma tem o SEU alcance, arco e dano; o ritmo é o da mais lenta das duas
-        // moveset: golpe 0 = SÓ a mão direita, golpe 1 = SÓ a esquerda (cada uma com a própria arma); o finalizador cruzado usa as duas
-        const hands = (dp ? (dFin || dStep >= 3 ? [wd, WEAPONS[dp[1].type] || wd] : [dStep === 1 ? (WEAPONS[dp[1].type] || wd) : wd]) : [wd]).map(w => {
-          let r = w.range, ar = w.arc, dm = w.dmg;
-          if (dp) {
-            if (dFin) { if (dSpr) { r *= 1.3; dm *= 1.7; } else { r *= 1.2; ar *= 1.5; dm *= dBot ? 1.6 : 1.6; } }
-            else if (dStep >= 3) { const mv = DUAL_MOVES[dStep]; r *= mv.r; ar = mv.ar; dm *= mv.dm; }
-            else if (dSpr && dStep === 1) { ar = 1.9; r *= 0.85; }
-          }
-          return { w, r, ar, dm };
-        });
-        if (dp) mCd *= Math.max(...hands.map(h => h.w.cd)) / wd.cd;   // golpe de uma mão só: ritmo da arma que bateu
-        p.cd = mCd * cadMulOf(p.skin, p.dualOn) * (p.fxCad || 1); p.swing = 0.2;
-        if (dp) { p.dc = (cK + 1) % cN; p.dcT = mCd + 0.5; }
-        this.events.push({ t: 'swing', by: p.id, w: p.weapon ? p.weapon.type : 'FISTS', x: p.x, y: p.y, a: p.angle, dc: dStep, w2: dp ? dp[1].type : undefined });
+        const hands = [{ w: wd, r: wd.range, ar: wd.arc, dm: wd.dmg }];
+        p.cd = wd.cd * (p.fxCad || 1); p.swing = 0.2;
+        this.events.push({ t: 'swing', by: p.id, w: p.weapon ? p.weapon.type : 'FISTS', x: p.x, y: p.y, a: p.angle, dc: -1 });
         // o golpe atinge todos os adversários dentro do arco
         let hitAny = false;
         for (const o of this.players) {
@@ -1145,7 +1094,7 @@
           }
         }
         // garrafa inteira que bate numa parede/porta/móvel: QUEBRA e vira garrafa quebrada (se acertou alguém, sobrevive)
-        if ((wd.brk || (dp && dp[1] && WEAPONS[dp[1].type] && WEAPONS[dp[1].type].brk)) && !hitAny && p.weapon) {
+        if (wd.brk && !hitAny && p.weapon) {
           const reach = PR + wd.range * 0.8;
           for (const off of [0, 0.45, -0.45]) {
             const a = p.angle + off, d = this.level.ray(p.x, p.y, a, reach);
@@ -1154,9 +1103,9 @@
         }
         return;
       }
-      const guns = dualPair(p) || [p.weapon], loaded = guns.filter(g => g.ammo > 0), dual = guns.length > 1;   // modo dupla do Shadow 7: as duas armas do mesmo tipo atiram juntas (uma de cada lado do corpo)
+      const guns = [p.weapon], loaded = guns.filter(g => g.ammo > 0), dual = false;   // modo dupla do Shadow 7: as duas armas do mesmo tipo atiram juntas (uma de cada lado do corpo)
       if (!loaded.length) { p.cd = 0.3; this.events.push({ t: 'click', by: p.id, x: p.x, y: p.y }); return; }
-      p.cd = Math.max(...loaded.map(g => WEAPONS[g.type].cd)) * gunCadOf(p.skin, p.dualOn) * (p.fxCad || 1);   // armas diferentes: o ritmo é o da mais lenta
+      p.cd = Math.max(...loaded.map(g => WEAPONS[g.type].cd)) * gunCadOf(p.skin) * (p.fxCad || 1);   // armas diferentes: o ritmo é o da mais lenta
       const cs = Math.cos(p.angle), sn = Math.sin(p.angle);
       let shotN = 0;
       guns.forEach((gun, gi) => {
@@ -1196,9 +1145,7 @@
     // Garrafa quebra: a arma da mão do jogador `p` vira a versão quebrada (GARRAFA QUEBRADA) e sai um estilhaço de vidro/vinho no ponto do impacto.
     shatter(p, x, y, a) {
       const wd = p.weapon && WEAPONS[p.weapon.type];
-      const dp = dualPair(p), o = dp && dp[1], od = o && WEAPONS[o.type];
       if (wd && wd.brk) p.weapon = { type: wd.brk, ammo: 0 };          // quebra UMA garrafa por vez: primeiro a da mão...
-      else if (od && od.brk) { o.type = od.brk; o.ammo = 0; }          // ...e na próxima batida a da outra mão (modo dupla do Shadow 7)
       else return false;
       this.events.push({ t: 'shatter', x, y, a, by: p.id });
       return true;
@@ -1213,7 +1160,7 @@
         return true;
       }
       v.emT = 0;   // tomou dano: para de dançar
-      if (how !== 'blast' && how !== 'door') { pct *= dmgTakenOf(v.skin); if (v.dualOn) pct *= PANTHER_DMG; if (v.fxDmg) pct *= v.fxDmg; }   // passiva: dano de ARMAS reduzido (a explosão do Shadow 2 não)
+      if (how !== 'blast' && how !== 'door') { pct *= dmgTakenOf(v.skin); if (v.fxDmg) pct *= v.fxDmg; }   // passiva: dano de ARMAS reduzido (a explosão do Shadow 2 não)
       if (by && by !== v) { const st = SKIN_STATS[by.skin]; if (st) { if (how === 'bullet' && st.gunDmg) pct *= st.gunDmg; if ((how === 'melee' || how === 'exec') && st.meleeDmg) pct *= st.meleeDmg; } }   // passivas de dano do atacante (Shadow 7: mais tiro, menos corpo a corpo)
       v.hp = Math.max(0, v.hp - MAX_HP * pct / 100);
       this.events.push({ t: 'hurt', id: v.id, x: v.x, y: v.y, a, hp: Math.round(v.hp), by: by ? by.id : null });
@@ -1222,7 +1169,7 @@
     }
     kill(v, by, how, a, w) {
       if (!v.alive || this.phase !== 'live') return;
-      const wasDk = (v.dualOn || (v.down && v.wasDual)) ? 1 : 0;   // máscara preta do Shadow 7 (modo dupla) na hora da morte
+      const wasDk = 0;   // máscara preta do Shadow 7 (modo dupla) na hora da morte
       v.alive = false; v.down = false; v.fire = false; v.charging = false;
       if (by && by !== v) by.kills = (by.kills | 0) + 1;
       this.dropAll(v, Math.cos(a) * 120, Math.sin(a) * 120);
@@ -1231,7 +1178,7 @@
     knockdown(p, dur, a, keepWeapon = false) {   // keepWeapon: só atordoa, a arma continua na mão (gancho do Shadow 4)
       if (!p.alive || p.down || p.dive) return;
       p.hook = null; p.hookOn = false;
-      p.down = true; p.downT = dur; p.fire = false; p.wasDual = !!p.dualOn;   // Shadow 7: caído continua com a máscara preta se estava no modo dupla
+      p.down = true; p.downT = dur; p.fire = false;   // Shadow 7: caído continua com a máscara preta se estava no modo dupla
       if (!keepWeapon) this.dropWeapon(p, Math.cos(a) * 220, Math.sin(a) * 220);
       this.events.push({ t: 'down', id: p.id, x: p.x, y: p.y, a });
     }
@@ -1246,15 +1193,6 @@
     // (100% no centro, 60% na borda). Precisa de linha de visão (parede protege). Não derruba, só machuca.
     useActive(p) {
       if (!p || !hasActive(p.skin) || !p.alive || p.down || p.healT > 0 || p.charging || p.hook || this.phase !== 'live') return false;
-      if (hasDual(p.skin)) {   // Shadow 7: a ativa liga/desliga o modo dupla
-        if (!p.dualOn && !canDual(p)) {   // sem 2 armas do mesmo tipo: a ativa não liga
-          this.events.push({ t: 'dualno', id: p.id, x: p.x, y: p.y });
-          return false;
-        }
-        p.dualOn = !p.dualOn; p.fire = false; p.buf = 0; p.cd = Math.max(p.cd, 0.12);
-        this.events.push({ t: 'dualeq', id: p.id, x: p.x, y: p.y, on: p.dualOn ? 1 : 0 });
-        return true;
-      }
       if (hasShield(p.skin)) {   // Shadow 7: a ativa liga o escudo (apertar de novo desliga)
         if (p.shieldT > 0) { p.shieldT = 0; this.events.push({ t: 'shield', id: p.id, x: p.x, y: p.y, on: 0 }); return true; }
         if (p.actCd > 0) return false;
@@ -1706,7 +1644,7 @@
           id: p.id, dv: p.dive ? 1 : 0, ai: +(p.air / DIVE_AIR).toFixed(2), sl: p.slot, nm: p.name, sk: p.skin, lk: p.look || 0, cl: p.color, sc: p.score, kl: p.kills | 0, x: r1(p.x), y: r1(p.y), a: Math.round(p.angle * 100) / 100,
           hp: Math.round(p.hp), hz: +Math.max(0, p.healT).toFixed(2), al: p.alive ? 1 : 0, dn: p.down ? 1 : 0, dt: +Math.max(0, p.downT).toFixed(2),
           w: p.weapon ? p.weapon.type : 0, am: p.weapon ? p.weapon.ammo : 0, se: p.sel, iv: p.inv.map(x => x ? [x.type, x.ammo] : 0), bot: p.bot ? 1 : 0, ch: p.charging ? +(p.chg / spearChargeOf(p.skin)).toFixed(2) : -1,
-          cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, sh: p.shieldT > 0 ? +p.shieldT.toFixed(2) : 0, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: p.dualOn ? (dualPair(p) ? 1 : 2) : 0, dk: (p.dualOn || (p.down && p.wasDual)) ? 1 : 0, hk: p.hook ? (p.hook.id ? (hq => hq ? hq.slot + 1 : 0)(this.byId(p.hook.id)) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
+          cn: p.coinT > 0 ? +(p.coinT / COIN_T).toFixed(3) : 0, fk: p.fx >= 0 ? p.fx + 1 : 0, fs: p.fxSpd && p.fxSpd !== 1 ? p.fxSpd : 1, sh: p.shieldT > 0 ? +p.shieldT.toFixed(2) : 0, su: p.sui > 0.01 ? +p.sui.toFixed(2) : 0, em: p.emT > 0 ? 1 : 0, sq: +p.actCd.toFixed(2), sn: +Math.max(0, p.slowT || 0).toFixed(2), hm: p.hookOn ? 1 : 0, dm: 0, dk: 0, hk: p.hook ? (p.hook.id ? (hq => hq ? hq.slot + 1 : 0)(this.byId(p.hook.id)) : -1) : 0, hx: p.hook && !p.hook.id ? Math.round(p.hook.ax) : 0, hy: p.hook && !p.hook.id ? Math.round(p.hook.ay) : 0   // hk = slot+1 de quem está preso no gancho; -1 = preso na parede/objeto em (hx,hy); 0 = sem gancho
         })),
         b: this.bullets.map(b => [b.id, r1(b.x), r1(b.y), Math.round(b.vx), Math.round(b.vy), (b.owner in slotOf ? slotOf[b.owner] : -1), b.r || 0]),   // [5] = slot de quem atirou (o cliente usa para não duplicar o tiro previsto)
         it: this.items.map(i => [i.id, r1(i.x), r1(i.y), i.type, i.ammo, Math.round(i.rot * 100) / 100, i.thrown ? 1 : 0, i.ot ? 1 : 0]),
@@ -1853,6 +1791,13 @@
         const can = los && !en.down && me.actCd <= 0 && dist > 220 && dist < HOOK_RANGE - 40 && err < 0.06;
         if (me.hookOn) { if (can) { if (me.cd <= 0) fp = 1; } else { sl = 1; fp = 0; } }
         else if (can) sl = 1;
+      } else if (hasShield(me.skin)) {
+        // Shadow 7: liga o escudo quando um inimigo com arma de fogo carregada esta de frente e perto
+        const ew = en.weapon ? WEAPONS[en.weapon.type] : null;
+        if (los && en.alive && ew && !ew.melee && en.weapon.ammo > 0 && dist < 650 && me.shieldT <= 0 && me.actCd <= 0) sl = 1;
+      } else if (hasActive(me.skin)) {
+        // Shadow 2: explosao em area quando o inimigo esta dentro do raio e ainda sobra vida
+        if (los && en.alive && dist < ACT_RADIUS - 15 && me.actCd <= 0 && me.hp > maxHpOf(me.skin) * 0.35) sl = 1;
       }
       g.applyInput(me, { k, a: this.ang, ad: en.alive ? dist : HOOK_RANGE, f: fire, fp, pk, it: itx, th, hl, sw, sl }, dt);
     }

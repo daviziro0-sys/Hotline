@@ -5,7 +5,7 @@
 (() => {
   const ov = document.getElementById('boot'); if (!ov) return;
   const cv = ov.firstElementChild, c = cv.getContext('2d', { alpha: false });
-  const SCRIPTS = ['shared.js', 'p2p.js', 'game.js', 'touch.js', 'menu-dc.js'];
+  const SCRIPTS = ['shared.js', 'p2p.js', 'cutscene.js', 'game.js', 'touch.js', 'menu-dc.js'];   // cutscene.js antes do game.js: ele chama window.playCutscene()
   const touchDev = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   const B = window.__boot = { done: false, onFinish: null, audio: null };
   let W = 0, H = 0, D = 1;

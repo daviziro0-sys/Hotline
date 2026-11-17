@@ -108,7 +108,7 @@ const P2P = (() => {
       if (c.p) return;
       const skin = SKINS.includes(m.skin) ? m.skin : m.skin === "HIPPO" ? "GORILLA" : "HERO";
       const name = String(m.name || "JOGADOR").replace(/[<>]/g, "").slice(0, 14);
-      const look = skin === "TIGER" && m.look === "preto" ? "preto" : "";
+      const look = skin === "TIGER" && m.look === "preto" ? "preto" : skin === "HERO" && m.look === "subaru" ? "subaru" : "";
       if (m.mode === "create") {
         if (!c.local || this.room || this.opening) return;
         this.opening = true;
@@ -211,7 +211,7 @@ const P2P = (() => {
         this.acc += Math.min(0.25, (now - this.last) / 1000);
         this.last = now;
         while (this.acc >= STEP) {
-          const every = this.room.clients.size > 3 ? 2 : 1;   // com mais de 3 jogadores envia 1 snapshot a cada 2 ticks
+          const every = 2;   // 30 snapshots/s (metade da banda); o cliente interpola e se adapta ao intervalo
           this.room.game.tick(STEP);
           if (++this.tickN % every === 0) this.broadcast();
           this.acc -= STEP;
@@ -234,7 +234,8 @@ const P2P = (() => {
       const game = this.room.game, snap = game.snapshot();
       game.events = [];
       const base = JSON.stringify(snap).slice(0, -1) + ',"room":"' + this.room.code + '","n":' + (++this.snapN);
-      for (const c of this.room.clients) if (c.p) c.send(base + ',"ack":' + (c.p.ack | 0) + "}", true);
+      const droppable = !(snap.ev && snap.ev.length);   // snapshot com eventos (morte, tiro, som) nunca e descartado
+      for (const c of this.room.clients) if (c.p) c.send(base + ',"ack":' + (c.p.ack | 0) + "}", droppable);
     }
 
     shutdown() {
